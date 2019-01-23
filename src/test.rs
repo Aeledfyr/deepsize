@@ -1,4 +1,5 @@
 use crate::DeepSizeOf;
+use crate::known_deep_size;
 
 #[test]
 fn primitive_types() {
@@ -39,6 +40,25 @@ fn slices() {
     );
 }
 
+// TODO: find edge cases
+#[test]
+fn alignment() {
+    #[repr(align(256))]
+    struct Test(u8);
+    known_deep_size!(0, Test);
+    
+    struct Test2(Test, u8);
+    known_deep_size!(0, Test2);
+    
+    let array: [Test; 3] = [Test(5), Test(16), Test(2)];
+    assert_eq!(std::mem::size_of::<[Test; 3]>(), array.deep_size_of());
+    
+    let vec = vec![Test(5), Test(16), Test(2)];
+    assert_eq!(array.deep_size_of(), 256 * 3);
+    
+    let vec = vec![Test2(Test(5), 0), Test2(Test(16), 0), Test2(Test(2), 0)];
+    assert_eq!(array.deep_size_of(), 256 * 3);
+}
 
 mod context_tests {
     use crate::Context;

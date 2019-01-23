@@ -10,7 +10,7 @@ macro_rules! known_deep_size(
         $(
             impl $crate::DeepSizeOf for $type {
                 #[inline(always)]
-                fn deep_size_of_children(&self, _: &mut Context) -> usize {
+                fn deep_size_of_children(&self, _: &mut $crate::Context) -> usize {
                     $size
                 }
             }
@@ -20,7 +20,7 @@ macro_rules! known_deep_size(
         $(
             impl<$($gen: $crate::HeapSizeOf),+> $crate::DeepSizeOf for $type<$($gen),+> {
                 #[inline(always)]
-                fn deep_size_of_children(&self, _: &mut Context) -> usize {
+                fn deep_size_of_children(&self, _: &mut $crate::Context) -> usize {
                     $size
                 }
             }

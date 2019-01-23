@@ -94,6 +94,61 @@ where
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
+         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+        // Size of unused capacity
+    }
+}
+
+impl<T> DeepSizeOf for std::collections::VecDeque<T>
+where
+    T: DeepSizeOf,
+{
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.iter()
+            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
+         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+        // Size of unused capacity
+    }
+}
+
+impl<T> DeepSizeOf for std::collections::LinkedList<T>
+where
+    T: DeepSizeOf,
+{
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.iter().fold(0, |sum, child| {
+            sum + child.recurse_deep_size_of(context)
+             + std::mem::size_of::<usize>() * 2 // overhead of each node
+        })
+    }
+}
+
+impl<K, V, S> DeepSizeOf for std::collections::HashMap<K, V, S>
+where
+    K: DeepSizeOf + Eq + std::hash::Hash, V: DeepSizeOf, S: std::hash::BuildHasher
+{
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.iter()
+            .fold(0, |sum, (key, val)| {
+                sum + key.recurse_deep_size_of(context)
+                    + val.recurse_deep_size_of(context)
+            })
+         + (self.capacity() - self.len()) * (std::mem::size_of::<K>() + std::mem::size_of::<V>())
+        // Size of unused capacity
+    }
+}
+
+impl<T, S> DeepSizeOf for std::collections::HashSet<T, S>
+where
+    T: DeepSizeOf + Eq + std::hash::Hash, S: std::hash::BuildHasher
+{
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.iter()
+            .fold(0, |sum, item| {
+                sum + item.recurse_deep_size_of(context)
+            })
+         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+        // Size of unused capacity
     }
 }
 

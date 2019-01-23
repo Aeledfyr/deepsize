@@ -6,7 +6,3 @@ edition = "2018"
 
 [dependencies]
 deepsize_derive = { path = "deepsize_derive"}
-
-[[bin]]
-name = "derive"
-path = "examples/derive.rs"

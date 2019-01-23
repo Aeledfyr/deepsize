@@ -1,16 +1,14 @@
-
 pub use deepsize_derive::*;
 
 mod default_impls;
 #[cfg(test)]
 mod test;
 
-
 pub trait DeepSizeOf {
     fn deep_size_of(&self) -> usize {
         self.recurse_deep_size_of(&mut Context::new())
     }
-    
+
     /// Returns an estimation of a total size of memory owned by the
     /// object, including heap-managed storage.
     ///
@@ -19,14 +17,14 @@ pub trait DeepSizeOf {
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         self.stack_size() + self.deep_size_of_children(context)
     }
-    
+
     /// Returns an estimation of a total size of memory owned by the
     /// object, including heap-managed storage.
     ///
     /// This is an estimation and not a precise result, because it
     /// doesn't account for allocator's overhead.
     fn deep_size_of_children(&self, context: &mut Context) -> usize;
-    
+
     /// Returns the size of the memory the object uses on the stack,
     /// assuming that it is on
     ///
@@ -56,7 +54,7 @@ impl Context {
             refs: HashSet::new(),
         }
     }
-    
+
     fn add_arc<T>(&mut self, arc: &std::sync::Arc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `ArcInner`
         // object without changing the count
@@ -67,7 +65,7 @@ impl Context {
         let pointer: usize = *unsafe { std::mem::transmute::<&std::sync::Arc<T>, &usize>(arc) };
         self.arcs.contains(&pointer)
     }
-    
+
     fn add_rc<T>(&mut self, rc: &std::rc::Rc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `RcBox`
         // object without changing the count
@@ -78,7 +76,7 @@ impl Context {
         let pointer: usize = *unsafe { std::mem::transmute::<&std::rc::Rc<T>, &usize>(rc) };
         self.rcs.contains(&pointer)
     }
-    
+
     fn add_ref<T>(&mut self, reference: &T) {
         let pointer: usize = reference as *const _ as usize;
         self.refs.insert(pointer);
@@ -89,14 +87,20 @@ impl Context {
     }
 }
 
-
-impl<T> DeepSizeOf for std::vec::Vec<T> where T: DeepSizeOf {
+impl<T> DeepSizeOf for std::vec::Vec<T>
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter().fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
+        self.iter()
+            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
     }
 }
 
-impl<T> DeepSizeOf for std::boxed::Box<T> where T: DeepSizeOf {
+impl<T> DeepSizeOf for std::boxed::Box<T>
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         // May cause inacuracies, measures size of the value, but not the allocation size
         let val: &T = &*self;
@@ -104,7 +108,10 @@ impl<T> DeepSizeOf for std::boxed::Box<T> where T: DeepSizeOf {
     }
 }
 
-impl<T> DeepSizeOf for std::sync::Arc<T> where T: DeepSizeOf {
+impl<T> DeepSizeOf for std::sync::Arc<T>
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         let val: &T = &*self;
         val.recurse_deep_size_of(context)
@@ -120,7 +127,10 @@ impl<T> DeepSizeOf for std::sync::Arc<T> where T: DeepSizeOf {
     }
 }
 
-impl<T> DeepSizeOf for std::rc::Rc<T> where T: DeepSizeOf {
+impl<T> DeepSizeOf for std::rc::Rc<T>
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         let val: &T = &*self;
         val.recurse_deep_size_of(context)
@@ -136,7 +146,10 @@ impl<T> DeepSizeOf for std::rc::Rc<T> where T: DeepSizeOf {
     }
 }
 
-impl<T: ?Sized> DeepSizeOf for &T where T: DeepSizeOf {
+impl<T: ?Sized> DeepSizeOf for &T
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         if context.contains_ref(&self) {
             0
@@ -156,12 +169,16 @@ impl<T: ?Sized> DeepSizeOf for &T where T: DeepSizeOf {
     }
 }
 
-impl<T> DeepSizeOf for [T] where T: DeepSizeOf {
+impl<T> DeepSizeOf for [T]
+where
+    T: DeepSizeOf,
+{
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter().fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
+        self.iter()
+            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
     }
-    
-    fn stack_size(&self) -> usize { 0 }
+
+    fn stack_size(&self) -> usize {
+        0
+    }
 }
-
-

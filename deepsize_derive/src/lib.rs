@@ -2,13 +2,14 @@
 ///
 /// Mainly from `syn`'s heap_size derive example:
 /// https://github.com/dtolnay/syn/commits/master/examples/heapsize/heapsize_derive/src/lib.rs
-
 extern crate proc_macro;
 
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, parse_quote, Data, DeriveInput, Fields, GenericParam, Generics, Index};
+use syn::{
+    parse_macro_input, parse_quote, Data, DeriveInput, Fields, GenericParam, Generics, Index,
+};
 
 #[proc_macro_derive(DeepSizeOf)]
 pub fn derive_deep_size(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

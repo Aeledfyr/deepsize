@@ -1,7 +1,4 @@
-
-
-use crate::{DeepSizeOf, Context};
-
+use crate::{Context, DeepSizeOf};
 
 /// For use on types defined in external crates
 /// with known heap sizes.
@@ -36,11 +33,15 @@ known_deep_size!(0, u8, u16, u32, u64, usize);
 known_deep_size!(0, i8, i16, i32, i64, isize);
 known_deep_size!(0, f32, f64);
 known_deep_size!(0, ());
-known_deep_size!(0, std::sync::atomic::AtomicBool, std::sync::atomic::AtomicIsize, std::sync::atomic::AtomicUsize);
-
+known_deep_size!(
+    0,
+    std::sync::atomic::AtomicBool,
+    std::sync::atomic::AtomicIsize,
+    std::sync::atomic::AtomicUsize
+);
 
 impl<T: ?Sized> DeepSizeOf for std::marker::PhantomData<T> {
-    fn deep_size_of_children(&self, _: &mut Context) -> usize { 0 }
+    fn deep_size_of_children(&self, _: &mut Context) -> usize {
+        0
+    }
 }
-
-

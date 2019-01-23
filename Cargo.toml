@@ -2,7 +2,12 @@
 name = "deepsize"
 version = "0.1.0"
 authors = ["Aeledfyr <aeledfyr@gmail.com>"]
+license = "MIT"
+description = "A crate for measuring the total size of object on the stack and heap"
+repository = "https://github.com/Aeledfyr/deepsize/"
+readme = "README.md"
+include = ["Cargo.toml", "src/**/*.rs", "README.md", "LICENSE"]
 edition = "2018"
 
 [dependencies]
-deepsize_derive = { path = "deepsize_derive"}
+deepsize_derive = { path = "deepsize_derive", version = "0.1" }

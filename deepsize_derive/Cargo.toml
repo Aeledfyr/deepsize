@@ -2,6 +2,10 @@
 name = "deepsize_derive"
 version = "0.1.0"
 authors = ["Aeledfyr <aeledfyr@gmail.com>"]
+license = "MIT"
+description = "A crate for measuring the total size of object on the stack and heap"
+repository = "https://github.com/Aeledfyr/deepsize/"
+include = ["Cargo.toml", "src/**/*.rs", "../LICENSE"]
 edition = "2018"
 
 [lib]

@@ -1,5 +1,6 @@
 
 # deepsize
+![](https://img.shields.io/crates/v/deepsize.svg) [![](https://img.shields.io/badge/docs-deepsize-blue.svg)](https://docs.rs/deepsize)
 
 A trait and derive macro to recursively find the size of an object (heap and stack).
 

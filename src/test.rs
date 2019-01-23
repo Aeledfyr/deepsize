@@ -38,3 +38,39 @@ fn slices() {
         4 * 8 + std::mem::size_of::<usize>() * 2
     );
 }
+
+
+mod context_tests {
+    use crate::Context;
+
+    #[test]
+    fn context_arc_test() {
+        let mut context = Context::new();
+
+        let arc = std::sync::Arc::new(15);
+        assert_eq!(context.contains_arc(&arc), false);
+        context.add_arc(&arc);
+        assert_eq!(context.contains_arc(&arc), true);
+    }
+
+    #[test]
+    fn context_rc_test() {
+        let mut context = Context::new();
+
+        let rc = std::rc::Rc::new(15);
+        assert_eq!(context.contains_rc(&rc), false);
+        context.add_rc(&rc);
+        assert_eq!(context.contains_rc(&rc), true);
+    }
+
+    #[test]
+    fn context_ref_test() {
+        let mut context = Context::new();
+
+        let number = &42;
+        assert_eq!(context.contains_ref(number), false);
+        context.add_ref(number);
+        assert_eq!(context.contains_ref(number), true);
+    }
+}
+

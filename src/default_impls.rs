@@ -45,3 +45,9 @@ impl<T: ?Sized> DeepSizeOf for std::marker::PhantomData<T> {
         0
     }
 }
+
+impl DeepSizeOf for String {
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.as_str().deep_size_of_children(context)
+    }
+}

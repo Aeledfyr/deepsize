@@ -25,7 +25,6 @@
 //! ```
 //!
 
-
 pub use deepsize_derive::*;
 
 use std::collections::HashSet;
@@ -47,10 +46,24 @@ pub trait DeepSizeOf {
     ///
     /// This is an estimation and not a precise result, because it
     /// doesn't account for allocator's overhead.
+    ///
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    /// use std::collections::HashMap;
+    ///
+    /// let mut map: HashMap<Box<u32>, Vec<String>> = HashMap::new();
+    ///
+    /// map.insert(Box::new(42u32), vec![String::from("Hello World")]);
+    /// map.insert(Box::new(20u32), vec![String::from("Something")]);
+    /// map.insert(Box::new(0u32),  vec![String::from("A string")]);
+    /// map.insert(Box::new(255u32), vec![String::from("Dynamically Allocated!")]);
+    ///
+    /// assert_eq!(map.deep_size_of(), 1312);
+    /// ```
     fn deep_size_of(&self) -> usize {
         self.recurse_deep_size_of(&mut Context::new())
     }
-    
+
     /// Returns an estimation of a total size of memory owned by the
     /// object, including heap-managed storage.
     ///
@@ -58,6 +71,7 @@ pub trait DeepSizeOf {
     /// doesn't account for allocator's overhead.
     ///
     /// This is an internal function, and requires a [`Context`](Context)
+    /// to track visited references.
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         self.stack_size() + self.deep_size_of_children(context)
     }
@@ -67,6 +81,9 @@ pub trait DeepSizeOf {
     ///
     /// This is an estimation and not a precise result, because it
     /// doesn't account for allocator's overhead.
+    ///
+    /// This is an internal function, and requires a [`Context`](Context)
+    /// to track visited references.
     fn deep_size_of_children(&self, context: &mut Context) -> usize;
 
     /// Returns the size of the memory the object uses itself
@@ -107,7 +124,7 @@ impl Context {
             refs: HashSet::new(),
         }
     }
-    
+
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
     fn add_arc<T>(&mut self, arc: &std::sync::Arc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `ArcInner`
@@ -129,12 +146,14 @@ impl Context {
         self.rcs.insert(pointer);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
+    /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn contains_rc<T>(&self, rc: &std::rc::Rc<T>) -> bool {
         let pointer: usize = *unsafe { std::mem::transmute::<&std::rc::Rc<T>, &usize>(rc) };
         self.rcs.contains(&pointer)
     }
 
     /// Adds a [`reference`](std::reference) to the list of visited [`reference`](std::reference)s
+    /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn add_ref<T>(&mut self, reference: &T) {
         let pointer: usize = reference as *const _ as usize;
         self.refs.insert(pointer);
@@ -150,6 +169,33 @@ impl<T> DeepSizeOf for std::vec::Vec<T>
 where
     T: DeepSizeOf,
 {
+    /// Sums the size of each child object, and then adds the size of
+    /// the unused capacity.
+    ///
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    ///
+    /// let mut vec: Vec<u8> = vec![];
+    /// for i in 0..13 {
+    ///     vec.push(i);
+    /// }
+    ///
+    /// // The capacity (16) plus three usizes (len, cap, pointer)
+    /// assert_eq!(vec.deep_size_of(), 16 + 24);
+    /// ```
+    /// With allocated objects:
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    ///
+    /// let mut vec: Vec<Box<u64>> = vec![];
+    /// for i in 0..13 {
+    ///     vec.push(Box::new(i));
+    /// }
+    ///
+    /// // The capacity (16?) * size (8) plus three usizes (len, cap, pointer)
+    /// // and length (13) * the allocated size of each object
+    /// assert_eq!(vec.deep_size_of(), 24 + vec.capacity() * 8 + 13 * 8);
+    /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
@@ -162,6 +208,37 @@ impl<T> DeepSizeOf for std::collections::VecDeque<T>
 where
     T: DeepSizeOf,
 {
+    /// Sums the size of each child object, and then adds the size of
+    /// the unused capacity.
+    ///
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    /// use std::collections::VecDeque;
+    ///
+    /// let mut vec: VecDeque<u8> = VecDeque::new();
+    /// for i in 0..12 {
+    ///     vec.push_back(i);
+    /// }
+    /// vec.push_front(13);
+    ///
+    /// // The capacity (15?) plus four usizes (start, end, cap, pointer)
+    /// assert_eq!(vec.deep_size_of(), vec.capacity() * 1 + 32);
+    /// ```
+    /// With allocated objects:
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    /// use std::collections::VecDeque;
+    ///
+    /// let mut vec: VecDeque<Box<u64>> = VecDeque::new();
+    /// for i in 0..12 {
+    ///     vec.push_back(Box::new(i));
+    /// }
+    /// vec.push_front(Box::new(13));
+    ///
+    /// // The capacity (15?) * size (8) plus four usizes (start, end, cap, pointer)
+    /// // and length (13) * the allocated size of each object
+    /// assert_eq!(vec.deep_size_of(), 32 + vec.capacity() * 8 + 13 * 8);
+    /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
@@ -174,6 +251,22 @@ impl<T> DeepSizeOf for std::collections::LinkedList<T>
 where
     T: DeepSizeOf,
 {
+    /// Sums the size of each child object, assuming the overhead of
+    /// each node is 2 usize (next, prev)
+    ///
+    /// ```rust
+    /// use deepsize::DeepSizeOf;
+    /// use std::collections::LinkedList;
+    ///
+    /// let mut list: LinkedList<u8> = LinkedList::new();
+    /// for i in 0..12 {
+    ///     list.push_back(i);
+    /// }
+    /// list.push_front(13);
+    ///
+    /// assert_eq!(list.deep_size_of(), std::mem::size_of::<LinkedList<u8>>()
+    ///                                + 13 * 1 + 13 * 2 * 8);
+    /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter().fold(0, |sum, child| {
             sum + child.recurse_deep_size_of(context)
@@ -186,13 +279,17 @@ impl<K, V, S> DeepSizeOf for std::collections::HashMap<K, V, S>
 where
     K: DeepSizeOf + Eq + std::hash::Hash, V: DeepSizeOf, S: std::hash::BuildHasher
 {
+    // FIXME
+    // How much more overhead is there to a hashmap? The docs say it is
+    // essensially just a Vec<Option<(u64, K, V)>>
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, (key, val)| {
-                sum + key.recurse_deep_size_of(context)
-                    + val.recurse_deep_size_of(context)
+                sum + key.deep_size_of_children(context)
+                    + val.deep_size_of_children(context)
+                    + std::mem::size_of::<Option<(u64, K, V)>>()
             })
-         + (self.capacity() - self.len()) * (std::mem::size_of::<K>() + std::mem::size_of::<V>())
+         + (self.capacity() - self.len()) * (std::mem::size_of::<Option<(u64, K, V)>>())
         // Size of unused capacity
     }
 }
@@ -204,9 +301,10 @@ where
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, item| {
-                sum + item.recurse_deep_size_of(context)
+                sum + item.deep_size_of_children(context)
+                    + std::mem::size_of::<Option<(u64, T, ())>>()
             })
-         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+         + (self.capacity() - self.len()) * (std::mem::size_of::<Option<(u64, T, ())>>())
         // Size of unused capacity
     }
 }

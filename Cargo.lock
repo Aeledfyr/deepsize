@@ -1,6 +1,6 @@
 [[package]]
 name = "deepsize"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "deepsize_derive 0.1.0",
 ]

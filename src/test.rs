@@ -54,10 +54,10 @@ fn alignment() {
     assert_eq!(std::mem::size_of::<[Test; 3]>(), array.deep_size_of());
     
     let vec = vec![Test(5), Test(16), Test(2)];
-    assert_eq!(array.deep_size_of(), 256 * 3);
+    assert_eq!(vec.deep_size_of(), 256 * 3 + 24);
     
     let vec = vec![Test2(Test(5), 0), Test2(Test(16), 0), Test2(Test(2), 0)];
-    assert_eq!(array.deep_size_of(), 256 * 3);
+    assert_eq!(vec.deep_size_of(), 512 * 3 + 24);
 }
 
 mod context_tests {
@@ -94,3 +94,14 @@ mod context_tests {
     }
 }
 
+fn test_derive() {
+    
+    #[derive(DeepSizeOf)]
+    enum Example {
+        One,
+        Two(),
+        Three(u32, Box<u8>),
+        Four { name: Box<u32> },
+        Five { },
+    }
+}

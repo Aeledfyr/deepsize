@@ -6,7 +6,7 @@ license = "MIT"
 description = "A crate for measuring the total size of object on the stack and heap"
 repository = "https://github.com/Aeledfyr/deepsize/"
 include = ["Cargo.toml", "src/**/*.rs", "../LICENSE"]
-edition = "2018"
+edition = "2015"
 
 [lib]
 proc-macro = true

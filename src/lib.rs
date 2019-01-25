@@ -25,6 +25,13 @@
 //! ```
 //!
 
+// Hack so that #[derive(DeepSizeOf)] is usable within the crate
+// until [this](https://github.com/rust-lang/rust/pull/57407) stabalizes
+// Also means that both crates need to be on the 2015 edition
+mod deepsize { pub use super::*; }
+
+extern crate deepsize_derive;
+
 pub use deepsize_derive::*;
 
 use std::collections::HashSet;
@@ -73,7 +80,7 @@ pub trait DeepSizeOf {
     /// This is an internal function, and requires a [`Context`](Context)
     /// to track visited references.
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
-        self.stack_size() + self.deep_size_of_children(context)
+        std::mem::size_of_val(self) + self.deep_size_of_children(context)
     }
 
     /// Returns an estimation of a total size of memory owned by the
@@ -85,13 +92,6 @@ pub trait DeepSizeOf {
     /// This is an internal function, and requires a [`Context`](Context)
     /// to track visited references.
     fn deep_size_of_children(&self, context: &mut Context) -> usize;
-
-    /// Returns the size of the memory the object uses itself
-    ///
-    /// This method is generally equivalent to [`size_of_val`](std::mem::size_of_val)
-    fn stack_size(&self) -> usize {
-        std::mem::size_of_val(self)
-    }
 }
 
 
@@ -198,8 +198,8 @@ where
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
-            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
-         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
+         + self.capacity() * std::mem::size_of::<T>()
         // Size of unused capacity
     }
 }
@@ -241,8 +241,8 @@ where
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
-            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
-         + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
+         + self.capacity() * std::mem::size_of::<T>()
         // Size of unused capacity
     }
 }
@@ -287,10 +287,9 @@ where
             .fold(0, |sum, (key, val)| {
                 sum + key.deep_size_of_children(context)
                     + val.deep_size_of_children(context)
-                    + std::mem::size_of::<Option<(u64, K, V)>>()
             })
-         + (self.capacity() - self.len()) * (std::mem::size_of::<Option<(u64, K, V)>>())
-        // Size of unused capacity
+         + self.capacity() * std::mem::size_of::<Option<(u64, K, V)>>()
+        // Size of container capacity
     }
 }
 
@@ -302,10 +301,9 @@ where
         self.iter()
             .fold(0, |sum, item| {
                 sum + item.deep_size_of_children(context)
-                    + std::mem::size_of::<Option<(u64, T, ())>>()
             })
-         + (self.capacity() - self.len()) * (std::mem::size_of::<Option<(u64, T, ())>>())
-        // Size of unused capacity
+         + self.capacity() * std::mem::size_of::<Option<(u64, T, ())>>()
+        // Size container storage
     }
 }
 
@@ -331,10 +329,10 @@ where
 
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         if context.contains_arc(self) {
-            self.stack_size()
+            std::mem::size_of::<Self>()
         } else {
             context.add_arc(self);
-            self.stack_size() + self.deep_size_of_children(context)
+            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
         }
     }
 }
@@ -350,10 +348,10 @@ where
 
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         if context.contains_rc(self) {
-            self.stack_size()
+            std::mem::size_of::<Self>()
         } else {
             context.add_rc(self);
-            self.stack_size() + self.deep_size_of_children(context)
+            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
         }
     }
 }
@@ -373,10 +371,10 @@ where
 
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         if context.contains_ref(&self) {
-            self.stack_size()
+            std::mem::size_of::<Self>()
         } else {
             context.add_ref(&self);
-            self.stack_size() + self.deep_size_of_children(context)
+            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
         }
     }
 }
@@ -387,10 +385,6 @@ where
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
-            .fold(0, |sum, child| sum + child.recurse_deep_size_of(context))
-    }
-
-    fn stack_size(&self) -> usize {
-        0
+            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
     }
 }

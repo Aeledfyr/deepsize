@@ -1,3 +1,5 @@
+extern crate deepsize;
+
 use deepsize::DeepSizeOf;
 
 #[derive(DeepSizeOf)]

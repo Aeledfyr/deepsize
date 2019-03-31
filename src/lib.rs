@@ -20,7 +20,15 @@
 //!         b: Box::new(255),
 //!     };
 //!
+//!     // The stack size of the struct:
+//!     //  - The size of a u32 (4)
+//!     //  - 4 bytes padding (64 bit only)
+//!     //  - The stack size of the Box (a usize pointer, 32 or 64 bits: 4 or 8 bytes)
+//!     // + the size of a u8 (1), the Box's heap storage
+//!     #[cfg(target_pointer_width = "64")]
 //!     assert_eq!(object.deep_size_of(), 17);
+//!     #[cfg(target_pointer_width = "32")]
+//!     assert_eq!(object.deep_size_of(), 9);
 //! }
 //! ```
 //!
@@ -29,12 +37,11 @@
 // until [this](https://github.com/rust-lang/rust/pull/57407) stabalizes
 // Also means that both crates need to be on the 2015 edition
 mod deepsize { pub use super::*; }
-
 extern crate deepsize_derive;
-
 pub use deepsize_derive::*;
 
 use std::collections::HashSet;
+use std::mem::{size_of, size_of_val};
 
 mod default_impls;
 #[cfg(test)]
@@ -104,6 +111,7 @@ pub trait DeepSizeOf {
 /// Currently this counts each reference once, although there are arguments for
 /// only counting owned data, and ignoring partial ownership, or for counting
 /// partial refernces like Arc as its size divided by the strong reference count.
+///
 /// [Github Issue discussion here](https://github.com/dtolnay/request-for-implementation/issues/22)
 #[derive(Debug)]
 pub struct Context {

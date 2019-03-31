@@ -26,7 +26,7 @@ fn primitive_types() {
 #[test]
 fn boxes() {
     let boxed = Box::new(0u32);
-    assert_eq!(boxed.deep_size_of(), 4 + 8);
+    assert_eq!(boxed.deep_size_of(), 4 + std::mem::size_of::<usize>());
 }
 
 #[test]
@@ -94,6 +94,7 @@ mod context_tests {
     }
 }
 
+#[test]
 fn test_derive() {
     
     #[derive(DeepSizeOf)]

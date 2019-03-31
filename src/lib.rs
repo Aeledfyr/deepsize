@@ -75,44 +75,74 @@ pub trait DeepSizeOf {
     /// assert_eq!(map.deep_size_of(), 1312);
     /// ```
     fn deep_size_of(&self) -> usize {
-        self.recurse_deep_size_of(&mut Context::new())
+        size_of_val(self) + self.deep_size_of_children(&mut Context::new())
     }
-
-    /// Returns an estimation of a total size of memory owned by the
-    /// object, including heap-managed storage.
-    ///
-    /// This is an estimation and not a precise result, because it
-    /// doesn't account for allocator's overhead.
-    ///
-    /// This is an internal function, and requires a [`Context`](Context)
-    /// to track visited references.
+    
+    /// Deprecated: equivalent to `std::mem::size_of_val(val) + val.deep_size_of_children()`
+    #[deprecated(since="0.1.1", note="use `std::mem::size_of_val(val) + val.deep_size_of_children()` instead")]
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
-        std::mem::size_of_val(self) + self.deep_size_of_children(context)
+        size_of_val(self) + self.deep_size_of_children(context)
     }
 
-    /// Returns an estimation of a total size of memory owned by the
-    /// object, including heap-managed storage.
+    /// Returns an estimation of the heap-managed storage of this object.
+    /// This does not include the size of the object itself.
     ///
     /// This is an estimation and not a precise result, because it
     /// doesn't account for allocator's overhead.
     ///
     /// This is an internal function, and requires a [`Context`](Context)
-    /// to track visited references.
+    /// to track visited references.  Implementations of this function
+    /// should only call `deep_size_of_children`, and not `deep_size_of`
+    /// so that they reference tracking is not reset.
+    ///
+    /// If a struct and all of its children do not allocate or have references,
+    /// this method should return `0`, as it cannot have any heap allocated
+    /// children.  There is a shortcut macro for this implementation, [`known_size_of`](known_size_of),
+    /// used like `known_deep_size!(0, (), u32, u64);` which generates the impls.
+    ///
+    /// The most common way to use this method, and how the derive works,
+    /// is to call this method on each of the structs members and sum the
+    /// results, which works as long as all members of the struct implmeent
+    /// DeepSizeOf.
+    ///
+    /// To implement this for a collection type, you should sum the deep sizes of
+    /// the items of the collection and then add the size of the allocation of the
+    /// collection itself.  This can become much more complicated if the collection
+    /// has multiple seperate allocations.
+    ///
+    /// Here is an example from the implementation of `DeepSizeOf` for `Vec<T>`
+    /// ```rust, ignore
+    /// # use deepsize::{DeepSizeOf, Context};
+    /// impl<T> DeepSizeOf for std::vec::Vec<T> where T: DeepSizeOf {
+    ///     fn deep_size_of_children(&self, context: &mut Context) -> usize {
+    ///         // Size of heap allocations for each child
+    ///         self.iter().map(|child| child.deep_size_of_children(context)).sum()
+    ///          + self.capacity() * std::mem::size_of::<T>()  // Size Vec's heap allocation
+    ///     }
+    /// }
+    /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize;
 }
 
 
-/// The context of which references have already been seen
+/// The context of which references have already been seen.
+/// This should only be used in the implementation of the
+/// `deep_size_of_children` function, and (eventually, when this
+/// reaches 0.2) will not be able to be constructed, and only obtained
+/// from inside the function.
 ///
 /// Keeps track of the [`Arc`](std::sync::Arc)s, [`Rc`](std::rc::Rc)s, and references
 /// that have been visited, so that [`Arc`](std::sync::Arc)s and other references
 /// aren't double counted.
 ///
 /// Currently this counts each reference once, although there are arguments for
-/// only counting owned data, and ignoring partial ownership, or for counting
+/// only counting owned data and ignoring partial ownership, or for counting
 /// partial refernces like Arc as its size divided by the strong reference count.
 ///
 /// [Github Issue discussion here](https://github.com/dtolnay/request-for-implementation/issues/22)
+///
+/// This must be passed between `deep_size_of_children` calls when
+/// recursing, so that references are not double-counted.
 #[derive(Debug)]
 pub struct Context {
     /// A set of all [`Arcs`](std::sync::Arc) that have already been counted
@@ -207,7 +237,7 @@ where
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, child| sum + child.deep_size_of_children(context))
-         + self.capacity() * std::mem::size_of::<T>()
+         + self.capacity() * size_of::<T>()
         // Size of unused capacity
     }
 }
@@ -248,10 +278,9 @@ where
     /// assert_eq!(vec.deep_size_of(), 32 + vec.capacity() * 8 + 13 * 8);
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter()
-            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
-         + self.capacity() * std::mem::size_of::<T>()
-        // Size of unused capacity
+        // Deep size of children
+        self.iter().map(|child| child.deep_size_of_children(context)).sum::<usize>()
+         + self.capacity() * size_of::<T>()  // Size of Vec's heap allocation
     }
 }
 
@@ -277,8 +306,8 @@ where
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter().fold(0, |sum, child| {
-            sum + child.recurse_deep_size_of(context)
-             + std::mem::size_of::<usize>() * 2 // overhead of each node
+            sum + size_of_val(child) + child.deep_size_of_children(context)
+             + size_of::<usize>() * 2 // overhead of each node
         })
     }
 }
@@ -296,7 +325,7 @@ where
                 sum + key.deep_size_of_children(context)
                     + val.deep_size_of_children(context)
             })
-         + self.capacity() * std::mem::size_of::<Option<(u64, K, V)>>()
+         + self.capacity() * size_of::<Option<(u64, K, V)>>()
         // Size of container capacity
     }
 }
@@ -310,7 +339,7 @@ where
             .fold(0, |sum, item| {
                 sum + item.deep_size_of_children(context)
             })
-         + self.capacity() * std::mem::size_of::<Option<(u64, T, ())>>()
+         + self.capacity() * size_of::<Option<(u64, T, ())>>()
         // Size container storage
     }
 }
@@ -322,7 +351,7 @@ where
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         // May cause inacuracies, measures size of the value, but not the allocation size
         let val: &T = &*self;
-        val.recurse_deep_size_of(context)
+        size_of_val(val) + val.deep_size_of_children(context)
     }
 }
 
@@ -331,16 +360,13 @@ where
     T: DeepSizeOf,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        let val: &T = &*self;
-        val.recurse_deep_size_of(context)
-    }
-
-    fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         if context.contains_arc(self) {
-            std::mem::size_of::<Self>()
+            0
         } else {
             context.add_arc(self);
-            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
+            let val: &T = &*self;
+            // Size of the Arc, size of the value, size of the allocations of the value
+            size_of_val(val) + val.deep_size_of_children(context)
         }
     }
 }
@@ -350,16 +376,12 @@ where
     T: DeepSizeOf,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        let val: &T = &*self;
-        val.recurse_deep_size_of(context)
-    }
-
-    fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         if context.contains_rc(self) {
-            std::mem::size_of::<Self>()
+            0
         } else {
             context.add_rc(self);
-            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
+            let val: &T = &*self;
+            size_of_val(val) + val.deep_size_of_children(context)
         }
     }
 }
@@ -373,16 +395,7 @@ where
             0
         } else {
             context.add_ref(&self);
-            (*self).recurse_deep_size_of(context)
-        }
-    }
-
-    fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
-        if context.contains_ref(&self) {
-            std::mem::size_of::<Self>()
-        } else {
-            context.add_ref(&self);
-            std::mem::size_of::<Self>() + self.deep_size_of_children(context)
+            size_of_val(*self) + (*self).deep_size_of_children(context)
         }
     }
 }
@@ -392,7 +405,6 @@ where
     T: DeepSizeOf,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter()
-            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
+        self.iter().map(|child| child.deep_size_of_children(context)).sum()
     }
 }

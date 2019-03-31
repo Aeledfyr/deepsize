@@ -1,9 +1,20 @@
 use crate::{Context, DeepSizeOf};
 
-/// For use on types defined in external crates
-/// with known heap sizes.
+/// A macro to generate an impl for types with known heap sizes.
 ///
 /// Repurposed from the `heapsize` crate
+///
+/// Usage:
+/// ```rust
+/// # #[macro_use] extern crate deepsize; fn main() {
+/// struct A(u32);
+/// struct B(A, char);
+/// struct C(Box<u32>);
+///
+/// known_deep_size!(0, A, B); // A and B do not have any allocation
+/// known_deep_size!(4, C); // C will always have an allocation of 4 bytes
+/// # }
+/// ```
 #[macro_export]
 macro_rules! known_deep_size(
     ($size:expr, $($type:ty),+) => (

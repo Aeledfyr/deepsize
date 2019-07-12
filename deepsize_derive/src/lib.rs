@@ -1,11 +1,9 @@
-/// A basic DeepSizeOf Derive implementation
-///
-/// Mainly from `syn`'s heap_size derive example:
-/// https://github.com/dtolnay/syn/commits/master/examples/heapsize/heapsize_derive/src/lib.rs
+//! A basic DeepSizeOf Derive implementation
+//!
+//! Mainly from `syn`'s heap_size derive example:
+//! https://github.com/dtolnay/syn/commits/master/examples/heapsize/heapsize_derive/src/lib.rs
+
 extern crate proc_macro;
-extern crate proc_macro2;
-extern crate syn;
-extern crate quote;
 
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -138,11 +136,11 @@ fn get_matcher(var: &syn::Variant) -> TokenStream {
             quote!({#fields})
         }
     };
-    
+                                
     quote!(#matcher)
 }
 
-// Generate an expression to sum up the size of each field.
+/// Generate an expression to sum up the size of each field.
 fn deepsize_sum(data: &Data, struct_name: &proc_macro2::Ident) -> TokenStream {
     match *data {
         Data::Struct(ref inner) => {

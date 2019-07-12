@@ -21,9 +21,9 @@
 //!     };
 //!
 //!     // The stack size of the struct:
-//!     //  - The size of a u32 (4)
-//!     //  - 4 bytes padding (64 bit only)
-//!     //  - The stack size of the Box (a usize pointer, 32 or 64 bits: 4 or 8 bytes)
+//!     //    The size of a u32 (4)
+//!     //    4 bytes padding (64 bit only)
+//!     //    The stack size of the Box (a usize pointer, 32 or 64 bits: 4 or 8 bytes)
 //!     // + the size of a u8 (1), the Box's heap storage
 //!     #[cfg(target_pointer_width = "64")]
 //!     assert_eq!(object.deep_size_of(), 17);
@@ -33,11 +33,9 @@
 //! ```
 //!
 
-// Hack so that #[derive(DeepSizeOf)] is usable within the crate
-// until [this](https://github.com/rust-lang/rust/pull/57407) stabalizes
-// Also means that both crates need to be on the 2015 edition
-mod deepsize { pub use super::*; }
-extern crate deepsize_derive;
+#[cfg(feature = "derive")]
+extern crate self as deepsize;
+#[cfg(feature = "derive")]
 pub use deepsize_derive::*;
 
 use std::collections::HashSet;
@@ -63,16 +61,20 @@ pub trait DeepSizeOf {
     ///
     /// ```rust
     /// use deepsize::DeepSizeOf;
-    /// use std::collections::HashMap;
     ///
-    /// let mut map: HashMap<Box<u32>, Vec<String>> = HashMap::new();
+    /// let mut map: Vec<(Box<u32>, String)> = Vec::new();
     ///
-    /// map.insert(Box::new(42u32), vec![String::from("Hello World")]);
-    /// map.insert(Box::new(20u32), vec![String::from("Something")]);
-    /// map.insert(Box::new(0u32),  vec![String::from("A string")]);
-    /// map.insert(Box::new(255u32), vec![String::from("Dynamically Allocated!")]);
+    /// map.push((Box::new(42u32), String::from("Hello World")));
+    /// map.push((Box::new(20u32), String::from("Something")));
+    /// map.push((Box::new(0u32),  String::from("A string")));
+    /// map.push((Box::new(255u32), String::from("Dynamically Allocated!")));
     ///
-    /// assert_eq!(map.deep_size_of(), 1312);
+    /// assert_eq!(map.deep_size_of(), 
+    ///     std::mem::size_of::<Vec<(Box<u32>, String)>>() +
+    ///     4 * std::mem::size_of::<(Box<u32>, String)>() +
+    ///     4 * std::mem::size_of::<u32>() + 
+    ///     11 + 9 + 8 + 22
+    /// );
     /// ```
     fn deep_size_of(&self) -> usize {
         size_of_val(self) + self.deep_size_of_children(&mut Context::new())
@@ -90,10 +92,12 @@ pub trait DeepSizeOf {
     /// This is an estimation and not a precise result, because it
     /// doesn't account for allocator's overhead.
     ///
-    /// This is an internal function, and requires a [`Context`](Context)
-    /// to track visited references.  Implementations of this function
-    /// should only call `deep_size_of_children`, and not `deep_size_of`
-    /// so that they reference tracking is not reset.
+    /// This is an internal function (this shouldn't be called directly),
+    /// and requires a [`Context`](Context) to track visited references.
+    /// Implementations of this function should only call `deep_size_of_children`,
+    /// and not `deep_size_of` so that they reference tracking is not reset.
+    ///
+    /// In all other cases, `deep_size_of` should be called instead of this function.
     ///
     /// If a struct and all of its children do not allocate or have references,
     /// this method should return `0`, as it cannot have any heap allocated
@@ -117,7 +121,7 @@ pub trait DeepSizeOf {
     ///     fn deep_size_of_children(&self, context: &mut Context) -> usize {
     ///         // Size of heap allocations for each child
     ///         self.iter().map(|child| child.deep_size_of_children(context)).sum()
-    ///          + self.capacity() * std::mem::size_of::<T>()  // Size Vec's heap allocation
+    ///          + self.capacity() * std::mem::size_of::<T>()  // Size of Vec's heap allocation
     ///     }
     /// }
     /// ```
@@ -137,7 +141,7 @@ pub trait DeepSizeOf {
 ///
 /// Currently this counts each reference once, although there are arguments for
 /// only counting owned data and ignoring partial ownership, or for counting
-/// partial refernces like Arc as its size divided by the strong reference count.
+/// partial refernces such as Arc as its size divided by the strong reference count.
 ///
 /// [Github Issue discussion here](https://github.com/dtolnay/request-for-implementation/issues/22)
 ///
@@ -155,8 +159,8 @@ pub struct Context {
 
 impl Context {
     /// Creates a new empty context for use in the deep_size functions
-    pub fn new() -> Context {
-        Context {
+    fn new() -> Self {
+        Self {
             arcs: HashSet::new(),
             rcs:  HashSet::new(),
             refs: HashSet::new(),
@@ -167,12 +171,12 @@ impl Context {
     fn add_arc<T>(&mut self, arc: &std::sync::Arc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `ArcInner`
         // object without changing the count
-        let pointer: usize = *unsafe { std::mem::transmute::<&std::sync::Arc<T>, &usize>(arc) };
+        let pointer: usize = unsafe { *(arc as *const std::sync::Arc<T> as *const usize) };
         self.arcs.insert(pointer);
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
     fn contains_arc<T>(&self, arc: &std::sync::Arc<T>) -> bool {
-        let pointer: usize = *unsafe { std::mem::transmute::<&std::sync::Arc<T>, &usize>(arc) };
+        let pointer: usize = unsafe { *(arc as *const std::sync::Arc<T> as *const usize) };
         self.arcs.contains(&pointer)
     }
 
@@ -180,13 +184,13 @@ impl Context {
     fn add_rc<T>(&mut self, rc: &std::rc::Rc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `RcBox`
         // object without changing the count
-        let pointer: usize = *unsafe { std::mem::transmute::<&std::rc::Rc<T>, &usize>(rc) };
+        let pointer: usize = unsafe { *(rc as *const std::rc::Rc<T> as *const usize) };
         self.rcs.insert(pointer);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn contains_rc<T>(&self, rc: &std::rc::Rc<T>) -> bool {
-        let pointer: usize = *unsafe { std::mem::transmute::<&std::rc::Rc<T>, &usize>(rc) };
+        let pointer: usize = unsafe { *(rc as *const std::rc::Rc<T> as *const usize) };
         self.rcs.contains(&pointer)
     }
 
@@ -235,8 +239,7 @@ where
     /// assert_eq!(vec.deep_size_of(), 24 + vec.capacity() * 8 + 13 * 8);
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter()
-            .fold(0, |sum, child| sum + child.deep_size_of_children(context))
+        self.iter().map(|child| child.deep_size_of_children(context)).sum::<usize>()
          + self.capacity() * size_of::<T>()
         // Size of unused capacity
     }
@@ -319,6 +322,7 @@ where
     // FIXME
     // How much more overhead is there to a hashmap? The docs say it is
     // essensially just a Vec<Option<(u64, K, V)>>
+    // Update this to work for hashbrown::HashMap
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
             .fold(0, |sum, (key, val)| {

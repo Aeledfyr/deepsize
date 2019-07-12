@@ -1,6 +1,6 @@
 use crate::{Context, DeepSizeOf};
 
-/// A macro to generate an impl for types with known heap sizes.
+/// A macro to generate an impl for types with known inner allocation sizes.
 ///
 /// Repurposed from the `heapsize` crate
 ///
@@ -58,8 +58,9 @@ impl<T: ?Sized> DeepSizeOf for std::marker::PhantomData<T> {
 }
 
 impl DeepSizeOf for String {
-    fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.as_str().deep_size_of_children(context)
+    fn deep_size_of_children(&self, _: &mut Context) -> usize {
+        // Size of the allocation of the string
+        self.capacity()
     }
 }
 
@@ -125,3 +126,24 @@ deep_size_array!(29);
 deep_size_array!(30);
 deep_size_array!(31);
 deep_size_array!(32);
+
+macro_rules! deep_size_tuple ({ $(($n:tt, $T:ident)),+} => {
+    impl<$($T,)+> DeepSizeOf for ($($T,)+)
+        where $($T: DeepSizeOf,)+
+    {
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            0 $( + self.$n.deep_size_of_children(context))+
+        }
+    }
+});
+
+deep_size_tuple!((0, A));
+deep_size_tuple!((0, A), (1, B));
+deep_size_tuple!((0, A), (1, B), (2, C));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H), (8, I));
+deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H), (8, I), (9, J));

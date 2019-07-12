@@ -1,5 +1,6 @@
 use crate::DeepSizeOf;
 use crate::known_deep_size;
+use std::mem::size_of;
 
 #[test]
 fn primitive_types() {
@@ -60,9 +61,28 @@ fn alignment() {
     assert_eq!(vec.deep_size_of(), 512 * 3 + 24);
 }
 
+#[test]
+fn strings() {
+    let string_a = String::from("01234567");
+    let string_b = String::from("0123456789012345");
+    
+    assert_eq!(string_a.deep_size_of(), size_of::<String>() + 8);
+    assert_eq!(string_b.deep_size_of(), size_of::<String>() + 16);
+}
+
+#[test]
+fn tuples() {
+    // Alignment - ######## #.##.... 
+    let non_allocating = (45u64, (), (8u8, 16u16));
+    let allocating = (Box::new(42u32), String::from("Hello World"));
+    
+    assert_eq!(non_allocating.deep_size_of(), size_of::<(u64, (), (u8, u16))>());
+    assert_eq!(allocating.deep_size_of(), size_of::<(Box<()>, String)>() + 11 + 4);
+}
+
 mod context_tests {
     use crate::Context;
-
+    
     #[test]
     fn context_arc_test() {
         let mut context = Context::new();
@@ -94,15 +114,43 @@ mod context_tests {
     }
 }
 
+#[cfg(feature = "derive")]
 #[test]
 fn test_derive() {
     
-    #[derive(DeepSizeOf)]
-    enum Example {
-        One,
-        Two(),
-        Three(u32, Box<u8>),
-        Four { name: Box<u32> },
-        Five { },
+    #[test]
+    fn test_1() {
+        #[derive(DeepSizeOf)]
+        struct Example<'a>(&'a u32, &'a u32);
+
+        let number = &42;
+        let example = Example(number, number);
+
+        let size = example.deep_size_of();
+        assert_eq!(size, 2 * size_of::<usize>() + 4);
+    }
+
+    #[test]
+    fn test_enum() {
+        #[derive(DeepSizeOf)]
+        enum ExampleEnum {
+            One,
+            Two(),
+            Three(u32, Box<u8>),
+            Four { name: Box<u32> },
+            Five { },
+        }
+        
+        let variant_one = ExampleEnum::One;
+        let variant_two = ExampleEnum::Two();
+        let variant_three = ExampleEnum::Three(0, Box::new(255));
+        let variant_four = ExampleEnum::Four { name: Box::new(65536) };
+        let variant_five = ExampleEnum::Five { };
+        
+        assert_eq!(variant_one.deep_size_of(), 0);
+        assert_eq!(variant_two.deep_size_of(), 0);
+        assert_eq!(variant_three.deep_size_of(), size_of::<u32>() + size_of::<usize>() + size_of::<u8>());
+        assert_eq!(variant_four.deep_size_of(), size_of::<usize>() + size_of::<u32>());
+        assert_eq!(variant_five.deep_size_of(), 0);
     }
 }

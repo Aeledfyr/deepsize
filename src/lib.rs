@@ -326,7 +326,9 @@ where
 #[cfg(feature = "std")]
 impl<K, V, S> DeepSizeOf for std::collections::HashMap<K, V, S>
 where
-    K: DeepSizeOf + Eq + std::hash::Hash, V: DeepSizeOf, S: std::hash::BuildHasher
+    K: DeepSizeOf + Eq + std::hash::Hash,
+    V: DeepSizeOf,
+    S: std::hash::BuildHasher
 {
     // FIXME
     // How much more overhead is there to a hashmap? The docs say it is
@@ -346,14 +348,13 @@ where
 #[cfg(feature = "std")]
 impl<T, S> DeepSizeOf for std::collections::HashSet<T, S>
 where
-    T: DeepSizeOf + Eq + std::hash::Hash, S: std::hash::BuildHasher
+    T: DeepSizeOf + Eq + std::hash::Hash,
+    S: std::hash::BuildHasher
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
-            .fold(0, |sum, item| {
-                sum + item.deep_size_of_children(context)
-            })
-         + self.capacity() * size_of::<Option<(u64, T, ())>>()
+            .fold(0, |sum, item| sum + item.deep_size_of_children(context))
+            + self.capacity() * size_of::<Option<(u64, T, ())>>()
         // Size container storage
     }
 }

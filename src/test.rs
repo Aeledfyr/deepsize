@@ -75,7 +75,7 @@ fn strings() {
 
 #[test]
 fn tuples() {
-    // Alignment - ######## #.##.... 
+    // Alignment - ######## #.##....
     let non_allocating = (45u64, (), (8u8, 16u16));
     let allocating = (Box::new(42u32), String::from("Hello World"));
     
@@ -148,7 +148,7 @@ mod test_derive {
         let variant_two = ExampleEnum::Two();
         let variant_three = ExampleEnum::Three(0, Box::new(255));
         let variant_four = ExampleEnum::Four { name: Box::new(65536) };
-        let variant_five = ExampleEnum::Five { };
+        let variant_five = ExampleEnum::Five {};
         
         assert_eq!(variant_one.deep_size_of(), size_of::<ExampleEnum>());
         assert_eq!(variant_two.deep_size_of(), size_of::<ExampleEnum>());

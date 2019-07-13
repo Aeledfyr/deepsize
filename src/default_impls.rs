@@ -91,7 +91,7 @@ macro_rules! deep_size_array {
                 self.as_ref().deep_size_of_children(context)
             }
         }
-    }
+    };
 }
 
 // Can't wait for const generics
@@ -128,15 +128,17 @@ deep_size_array!(30);
 deep_size_array!(31);
 deep_size_array!(32);
 
-macro_rules! deep_size_tuple ({ $(($n:tt, $T:ident)),+} => {
-    impl<$($T,)+> DeepSizeOf for ($($T,)+)
-        where $($T: DeepSizeOf,)+
-    {
-        fn deep_size_of_children(&self, context: &mut Context) -> usize {
-            0 $( + self.$n.deep_size_of_children(context))+
+macro_rules! deep_size_tuple {
+    ($(($n:tt, $T:ident)),+ ) => {
+        impl<$($T,)+> DeepSizeOf for ($($T,)+)
+            where $($T: DeepSizeOf,)+
+        {
+            fn deep_size_of_children(&self, context: &mut Context) -> usize {
+                0 $( + self.$n.deep_size_of_children(context))+
+            }
         }
-    }
-});
+    };
+}
 
 deep_size_tuple!((0, A));
 deep_size_tuple!((0, A), (1, B));

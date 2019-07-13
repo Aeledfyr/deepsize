@@ -15,6 +15,7 @@ use crate::{Context, DeepSizeOf};
 /// known_deep_size!(4, C); // C will always have an allocation of 4 bytes
 /// # }
 /// ```
+/// 
 #[macro_export]
 macro_rules! known_deep_size(
     ($size:expr, $($type:ty),+) => (

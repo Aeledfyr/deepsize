@@ -44,10 +44,11 @@ pub use deepsize_derive::*;
 
 use core::mem::{size_of, size_of_val};
 
-mod default_impls;
 #[cfg(test)]
 mod test;
 
+mod default_impls;
+mod external_impls;
 
 /// A trait for measuring the size of an object and its children
 ///

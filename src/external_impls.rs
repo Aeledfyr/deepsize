@@ -8,7 +8,7 @@ mod slotmap_impl {
     
     impl<K, V> DeepSizeOf for slotmap::SlotMap<K, V>
     where
-        K: DeepSizeOf + slotmap::Key, V: DeepSizeOf: slotmap::Slottable,
+        K: DeepSizeOf + slotmap::Key, V: DeepSizeOf + slotmap::Slottable,
     {
         fn deep_size_of_children(&self, context: &mut Context) -> usize {
             self.iter()

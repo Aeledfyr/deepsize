@@ -23,5 +23,5 @@ default = ["std", "derive"]
 derive = ["deepsize_derive"]
 std = []
 
-slotmap = ["slotmap"]
+slotmap_support = ["slotmap"]
 

@@ -1,4 +1,5 @@
 #![forbid(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 //! A utility for recursively measuring the size of an object
 //!
@@ -33,13 +34,15 @@
 //! ```
 //!
 
+extern crate alloc;
+extern crate core;
+
 #[cfg(feature = "derive")]
 extern crate self as deepsize;
 #[cfg(feature = "derive")]
 pub use deepsize_derive::*;
 
-use std::collections::HashSet;
-use std::mem::{size_of, size_of_val};
+use core::mem::{size_of, size_of_val};
 
 mod default_impls;
 #[cfg(test)]
@@ -128,6 +131,10 @@ pub trait DeepSizeOf {
     fn deep_size_of_children(&self, context: &mut Context) -> usize;
 }
 
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeSet as GenericSet;
+#[cfg(feature = "std")]
+use std::collections::HashSet as GenericSet;
 
 /// The context of which references have already been seen.
 /// This should only be used in the implementation of the
@@ -150,47 +157,47 @@ pub trait DeepSizeOf {
 #[derive(Debug)]
 pub struct Context {
     /// A set of all [`Arcs`](std::sync::Arc) that have already been counted
-    arcs: HashSet<usize>,
+    arcs: GenericSet<usize>,
     /// A set of all [`Rcs`](std::sync::Arc) that have already been counted
-    rcs: HashSet<usize>,
+    rcs: GenericSet<usize>,
     /// A set of all normal references that have already been counted
-    refs: HashSet<usize>,
+    refs: GenericSet<usize>,
 }
 
 impl Context {
     /// Creates a new empty context for use in the deep_size functions
     fn new() -> Self {
         Self {
-            arcs: HashSet::new(),
-            rcs:  HashSet::new(),
-            refs: HashSet::new(),
+            arcs: GenericSet::new(),
+            rcs:  GenericSet::new(),
+            refs: GenericSet::new(),
         }
     }
 
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
-    fn add_arc<T>(&mut self, arc: &std::sync::Arc<T>) {
+    fn add_arc<T>(&mut self, arc: &alloc::sync::Arc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `ArcInner`
         // object without changing the count
-        let pointer: usize = unsafe { *(arc as *const std::sync::Arc<T> as *const usize) };
+        let pointer: usize = unsafe { *(arc as *const alloc::sync::Arc<T> as *const usize) };
         self.arcs.insert(pointer);
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
-    fn contains_arc<T>(&self, arc: &std::sync::Arc<T>) -> bool {
-        let pointer: usize = unsafe { *(arc as *const std::sync::Arc<T> as *const usize) };
+    fn contains_arc<T>(&self, arc: &alloc::sync::Arc<T>) -> bool {
+        let pointer: usize = unsafe { *(arc as *const alloc::sync::Arc<T> as *const usize) };
         self.arcs.contains(&pointer)
     }
 
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn add_rc<T>(&mut self, rc: &std::rc::Rc<T>) {
+    fn add_rc<T>(&mut self, rc: &alloc::rc::Rc<T>) {
         // Somewhat unsafe way of getting a pointer to the inner `RcBox`
         // object without changing the count
-        let pointer: usize = unsafe { *(rc as *const std::rc::Rc<T> as *const usize) };
+        let pointer: usize = unsafe { *(rc as *const alloc::rc::Rc<T> as *const usize) };
         self.rcs.insert(pointer);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn contains_rc<T>(&self, rc: &std::rc::Rc<T>) -> bool {
-        let pointer: usize = unsafe { *(rc as *const std::rc::Rc<T> as *const usize) };
+    fn contains_rc<T>(&self, rc: &alloc::rc::Rc<T>) -> bool {
+        let pointer: usize = unsafe { *(rc as *const alloc::rc::Rc<T> as *const usize) };
         self.rcs.contains(&pointer)
     }
 
@@ -207,7 +214,7 @@ impl Context {
     }
 }
 
-impl<T> DeepSizeOf for std::vec::Vec<T>
+impl<T> DeepSizeOf for alloc::vec::Vec<T>
 where
     T: DeepSizeOf,
 {
@@ -245,7 +252,7 @@ where
     }
 }
 
-impl<T> DeepSizeOf for std::collections::VecDeque<T>
+impl<T> DeepSizeOf for alloc::collections::VecDeque<T>
 where
     T: DeepSizeOf,
 {
@@ -287,7 +294,7 @@ where
     }
 }
 
-impl<T> DeepSizeOf for std::collections::LinkedList<T>
+impl<T> DeepSizeOf for alloc::collections::LinkedList<T>
 where
     T: DeepSizeOf,
 {
@@ -315,6 +322,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<K, V, S> DeepSizeOf for std::collections::HashMap<K, V, S>
 where
     K: DeepSizeOf + Eq + std::hash::Hash, V: DeepSizeOf, S: std::hash::BuildHasher
@@ -334,6 +342,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<T, S> DeepSizeOf for std::collections::HashSet<T, S>
 where
     T: DeepSizeOf + Eq + std::hash::Hash, S: std::hash::BuildHasher
@@ -348,7 +357,7 @@ where
     }
 }
 
-impl<T> DeepSizeOf for std::boxed::Box<T>
+impl<T> DeepSizeOf for alloc::boxed::Box<T>
 where
     T: DeepSizeOf,
 {
@@ -359,7 +368,7 @@ where
     }
 }
 
-impl<T> DeepSizeOf for std::sync::Arc<T>
+impl<T> DeepSizeOf for alloc::sync::Arc<T>
 where
     T: DeepSizeOf,
 {
@@ -375,7 +384,7 @@ where
     }
 }
 
-impl<T> DeepSizeOf for std::rc::Rc<T>
+impl<T> DeepSizeOf for alloc::rc::Rc<T>
 where
     T: DeepSizeOf,
 {

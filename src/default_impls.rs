@@ -46,25 +46,25 @@ known_deep_size!(0, f32, f64);
 known_deep_size!(0, ());
 known_deep_size!(
     0,
-    std::sync::atomic::AtomicBool,
-    std::sync::atomic::AtomicIsize,
-    std::sync::atomic::AtomicUsize
+    core::sync::atomic::AtomicBool,
+    core::sync::atomic::AtomicIsize,
+    core::sync::atomic::AtomicUsize
 );
 
-impl<T: ?Sized> DeepSizeOf for std::marker::PhantomData<T> {
+impl<T: ?Sized> DeepSizeOf for core::marker::PhantomData<T> {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {
         0
     }
 }
 
-impl DeepSizeOf for String {
+impl DeepSizeOf for alloc::string::String {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {
         // Size of the allocation of the string
         self.capacity()
     }
 }
 
-impl<T: DeepSizeOf> DeepSizeOf for Option<T> {
+impl<T: DeepSizeOf> DeepSizeOf for core::option::Option<T> {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         match &self {
             Some(t) => t.deep_size_of_children(context),
@@ -73,7 +73,7 @@ impl<T: DeepSizeOf> DeepSizeOf for Option<T> {
     }
 }
 
-impl<R: DeepSizeOf, E: DeepSizeOf> DeepSizeOf for Result<R, E> {
+impl<R: DeepSizeOf, E: DeepSizeOf> DeepSizeOf for core::result::Result<R, E> {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         match &self {
             Ok(r)  => r.deep_size_of_children(context),

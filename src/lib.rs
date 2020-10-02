@@ -82,15 +82,6 @@ pub trait DeepSizeOf {
         size_of_val(self) + self.deep_size_of_children(&mut Context::new())
     }
 
-    /// Deprecated: equivalent to `std::mem::size_of_val(val) + val.deep_size_of_children()`
-    #[deprecated(
-        since = "0.1.1",
-        note = "use `std::mem::size_of_val(val) + val.deep_size_of_children()` instead"
-    )]
-    fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
-        size_of_val(self) + self.deep_size_of_children(context)
-    }
-
     /// Returns an estimation of the heap-managed storage of this object.
     /// This does not include the size of the object itself.
     ///
@@ -162,8 +153,6 @@ pub struct Context {
     arcs: GenericSet<usize>,
     /// A set of all [`Rc`](std::sync::Arc)s that have already been counted
     rcs: GenericSet<usize>,
-    /// A set of all normal references that have already been counted
-    refs: GenericSet<usize>,
 }
 
 impl Context {
@@ -172,7 +161,6 @@ impl Context {
         Self {
             arcs: GenericSet::new(),
             rcs: GenericSet::new(),
-            refs: GenericSet::new(),
         }
     }
 
@@ -182,7 +170,8 @@ impl Context {
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
     fn contains_arc<T: ?Sized>(&self, arc: &alloc::sync::Arc<T>) -> bool {
-        self.arcs.contains(&(&**arc as *const T as *const u8 as usize))
+        self.arcs
+            .contains(&(&**arc as *const T as *const u8 as usize))
     }
 
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
@@ -192,19 +181,8 @@ impl Context {
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn contains_rc<T: ?Sized>(&self, rc: &alloc::rc::Rc<T>) -> bool {
-        self.rcs.contains(&(&**rc as *const T as *const u8 as usize))
-    }
-
-    /// Adds a [`reference`](std::reference) to the list of visited [`reference`](std::reference)s
-    /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn add_ref<T: ?Sized>(&mut self, reference: &T) {
-        let pointer: usize = reference as *const T as *const u8 as usize;
-        self.refs.insert(pointer);
-    }
-    /// Checks if a [`reference`](std::reference) is in the list of visited [`reference`](std::reference)s
-    fn contains_ref<T>(&self, reference: &T) -> bool {
-        let pointer: usize = reference as *const T as *const u8 as usize;
-        self.refs.contains(&pointer)
+        self.rcs
+            .contains(&(&**rc as *const T as *const u8 as usize))
     }
 }
 
@@ -327,29 +305,75 @@ where
     V: DeepSizeOf,
     S: std::hash::BuildHasher,
 {
-    // FIXME
     // How much more overhead is there to a hashmap? The docs say it is
-    // essensially just a Vec<Option<(u64, K, V)>>
-    // Update this to work for hashbrown::HashMap
+    // essentially just a Vec<Option<(u64, K, V)>>;
+    // For the old implementation of HashMap:
+    // fn deep_size_of_children(&self, context: &mut Context) -> usize {
+    //     self.iter().fold(0, |sum, (key, val)| {
+    //         sum + key.deep_size_of_children(context) + val.deep_size_of_children(context)
+    //     }) + self.capacity() * size_of::<Option<(u64, K, V)>>()
+    // }
+    // For the hashbrown implementation of HashMap:
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter().fold(0, |sum, (key, val)| {
             sum + key.deep_size_of_children(context) + val.deep_size_of_children(context)
-        }) + self.capacity() * size_of::<Option<(u64, K, V)>>()
-        // Size of container capacity
+        }) + self.capacity() * size_of::<(K, V)>()
+        // Buckets would be the more correct value, but there isn't
+        // an API for accessing that with hashbrown.
+        // I believe that hashbrown's HashTable is represented as
+        // an array of (K, V), with control bytes at the start/end
+        // that mark used/uninitialized buckets (?)
     }
 }
 
 #[cfg(feature = "std")]
-impl<T, S> DeepSizeOf for std::collections::HashSet<T, S>
+impl<K, S> DeepSizeOf for std::collections::HashSet<K, S>
 where
-    T: DeepSizeOf + Eq + std::hash::Hash,
+    K: DeepSizeOf + Eq + std::hash::Hash,
     S: std::hash::BuildHasher,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        // self.iter()
+        //     .fold(0, |sum, item| sum + item.deep_size_of_children(context))
+        //     + self.capacity() * size_of::<Option<(u64, K, ())>>()
         self.iter()
-            .fold(0, |sum, item| sum + item.deep_size_of_children(context))
-            + self.capacity() * size_of::<Option<(u64, T, ())>>()
-        // Size container storage
+            .fold(0, |sum, key| sum + key.deep_size_of_children(context))
+            + self.capacity() * size_of::<K>()
+    }
+}
+
+// A btree node has 2*B - 1 (K,V) pairs and (usize, u16, u16)
+// overhead, and an internal btree node additionally has 2*B
+// `usize` overhead.
+// A node can contain between B - 1 and 2*B - 1 elements, so
+// we assume it has the midpoint 3/2*B - 1.
+
+// Constants from rust's source:
+// https://doc.rust-lang.org/src/alloc/collections/btree/node.rs.html#43-45
+
+const BTREE_B: usize = 6;
+const BTREE_MIN: usize = 2 * BTREE_B - 1;
+const BTREE_MAX: usize = BTREE_B - 1;
+
+#[cfg(feature = "std")]
+impl<K: Ord + DeepSizeOf, V: DeepSizeOf> DeepSizeOf for std::collections::BTreeMap<K, V> {
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        let element_size = self.iter().fold(0, |sum, (k, v)| {
+            sum + k.deep_size_of_children(context) + v.deep_size_of_children(context)
+        });
+        let overhead = size_of::<(usize, u16, u16, [(K, V); BTREE_MAX], [usize; BTREE_B])>();
+        element_size + self.len() * overhead * 2 / (BTREE_MAX + BTREE_MIN)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<K: Ord + DeepSizeOf> DeepSizeOf for std::collections::BTreeSet<K> {
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        let element_size = self
+            .iter()
+            .fold(0, |sum, item| sum + item.deep_size_of_children(context));
+        let overhead = size_of::<(usize, u16, u16, [K; BTREE_MAX], [usize; BTREE_B])>();
+        element_size + self.len() * overhead * 2 / (BTREE_MAX + BTREE_MIN)
     }
 }
 
@@ -394,17 +418,28 @@ where
     }
 }
 
+// References aren't owned; should they count?
 impl<T> DeepSizeOf for &T
 where
     T: DeepSizeOf + ?Sized,
 {
-    fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        if context.contains_ref(&self) {
-            0
-        } else {
-            context.add_ref(&self);
-            size_of_val(*self) + (*self).deep_size_of_children(context)
-        }
+    fn deep_size_of_children(&self, _context: &mut Context) -> usize {
+        0
+        // if context.contains_ref(&self) {
+        //     0
+        // } else {
+        //     context.add_ref(&self);
+        //     size_of_val(*self) + (*self).deep_size_of_children(context)
+        // }
+    }
+}
+
+impl<T> DeepSizeOf for &mut T
+where
+    T: DeepSizeOf + ?Sized,
+{
+    fn deep_size_of_children(&self, _context: &mut Context) -> usize {
+        0
     }
 }
 
@@ -418,3 +453,11 @@ where
             .sum()
     }
 }
+
+/*
+To add:
+std::collections::BTreeMap
+owning_ref::OwningRef
+std::path::PathBuf, std::path::Path
+num::BigUint, num::BigInt
+*/

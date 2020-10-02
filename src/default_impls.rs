@@ -11,31 +11,18 @@ use crate::{Context, DeepSizeOf};
 /// struct B(A, char);
 /// struct C(Box<u32>);
 ///
-/// known_deep_size!(0, A, B); // A and B do not have any allocation
-/// known_deep_size!(4, C); // C will always have an allocation of 4 bytes
+/// known_deep_size!(0; A, B); // A and B do not have any allocation
+/// known_deep_size!(4; C); // C will always have an allocation of 4 bytes
 /// # }
 /// ```
 #[macro_export]
-macro_rules! known_deep_size(
-    ($size:expr, $($type:ty,)+) => (
-        known_deep_size!($size, $($type),*);
+macro_rules! known_deep_size (
+    ($size:expr; $($({$($gen:tt)*})? $type:ty,)+) => (
+        known_deep_size!($size; $($({$($gen)*})? $type),*);
     );
-    ($size:expr, $($type:ty),+) => (
+    ($size:expr; $($({$($gen:tt)*})? $type:ty),+) => (
         $(
-            impl $crate::DeepSizeOf for $type {
-                #[inline(always)]
-                fn deep_size_of_children(&self, _: &mut $crate::Context) -> usize {
-                    $size
-                }
-            }
-        )+
-    );
-    ($size:expr, $($type:ident<$($gen:ident),+>,)+) => (
-        known_deep_size!($size, $($type<$($gen),+>),*);
-    );
-    ($size:expr, $($type:ident<$($gen:ident),+>),+) => (
-        $(
-            impl<$($gen: $crate::HeapSizeOf),+> $crate::DeepSizeOf for $type<$($gen),+> {
+            impl$(<$($gen)*>)? $crate::DeepSizeOf for $type {
                 #[inline(always)]
                 fn deep_size_of_children(&self, _: &mut $crate::Context) -> usize {
                     $size
@@ -45,16 +32,16 @@ macro_rules! known_deep_size(
     );
 );
 
-use core::sync::atomic;
 use core::num;
+use core::sync::atomic;
 
-known_deep_size!(0, bool, char, str);
-known_deep_size!(0, u8, u16, u32, u64, usize);
-known_deep_size!(0, i8, i16, i32, i64, isize);
-known_deep_size!(0, f32, f64);
-known_deep_size!(0, ());
-known_deep_size!(
-    0,
+known_deep_size!(0;
+    (), bool, char, str,
+    u8, u16, u32, u64, u128, usize,
+    i8, i16, i32, i64, i128, isize,
+    f32, f64,
+);
+known_deep_size!(0;
     atomic::AtomicBool,
     atomic::AtomicI8,
     atomic::AtomicI16,
@@ -81,15 +68,19 @@ known_deep_size!(
     num::NonZeroUsize,
 );
 
-impl<T: ?Sized> DeepSizeOf for core::marker::PhantomData<T> {
-    fn deep_size_of_children(&self, _: &mut Context) -> usize {
-        0
-    }
-}
+known_deep_size!(0;
+    {T: ?Sized} core::marker::PhantomData<T>,
+    {T} core::mem::MaybeUninit<T>,
+    // In theory this could be incorrect, but it's unlikely
+    {T: Copy} core::cell::Cell<T>,
+
+    // Weak reference counted pointers do not own their contents
+    {T} alloc::sync::Weak<T>,
+    {T} alloc::rc::Weak<T>,
+);
 
 impl DeepSizeOf for alloc::string::String {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {
-        // Size of the allocation of the string
         self.capacity()
     }
 }
@@ -112,51 +103,58 @@ impl<R: DeepSizeOf, E: DeepSizeOf> DeepSizeOf for core::result::Result<R, E> {
     }
 }
 
-macro_rules! deep_size_array {
-    ($num:expr) => {
-        impl<T: DeepSizeOf> DeepSizeOf for [T; $num] {
-            fn deep_size_of_children(&self, context: &mut Context) -> usize {
-                self.as_ref().deep_size_of_children(context)
-            }
+impl<T: DeepSizeOf> DeepSizeOf for core::cell::RefCell<T> {
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.borrow().deep_size_of_children(context)
+    }
+}
+
+#[cfg(feature = "std")]
+mod std_sync {
+    use crate::{Context, DeepSizeOf};
+
+    impl<T: DeepSizeOf> DeepSizeOf for std::sync::Mutex<T> {
+        /// This locks the `Mutex`, so it may deadlock; If the mutex is
+        /// poisoned, this returns 0
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            self.lock()
+                .map(|s| s.deep_size_of_children(context))
+                .unwrap_or(0)
         }
+    }
+
+    impl<T: DeepSizeOf> DeepSizeOf for std::sync::RwLock<T> {
+        /// This reads the `RwLock`, so it may deadlock; If the lock is
+        /// poisoned, this returns 0
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            self.read()
+                .map(|s| s.deep_size_of_children(context))
+                .unwrap_or(0)
+        }
+    }
+}
+
+macro_rules! deep_size_array {
+    ($($num:expr,)+) => {
+        deep_size_array!($($num),+);
+    };
+    ($($num:expr),+) => {
+        $(
+            impl<T: DeepSizeOf> DeepSizeOf for [T; $num] {
+                fn deep_size_of_children(&self, context: &mut Context) -> usize {
+                    self.as_ref().deep_size_of_children(context)
+                }
+            }
+        )+
     };
 }
 
 // Can't wait for const generics
 // A year and a half later, still waiting
-deep_size_array!(0);
-deep_size_array!(1);
-deep_size_array!(2);
-deep_size_array!(3);
-deep_size_array!(4);
-deep_size_array!(5);
-deep_size_array!(6);
-deep_size_array!(7);
-deep_size_array!(8);
-deep_size_array!(9);
-deep_size_array!(10);
-deep_size_array!(11);
-deep_size_array!(12);
-deep_size_array!(13);
-deep_size_array!(14);
-deep_size_array!(15);
-deep_size_array!(16);
-deep_size_array!(17);
-deep_size_array!(18);
-deep_size_array!(19);
-deep_size_array!(20);
-deep_size_array!(21);
-deep_size_array!(22);
-deep_size_array!(23);
-deep_size_array!(24);
-deep_size_array!(25);
-deep_size_array!(26);
-deep_size_array!(27);
-deep_size_array!(28);
-deep_size_array!(29);
-deep_size_array!(30);
-deep_size_array!(31);
-deep_size_array!(32);
+deep_size_array!(
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    26, 27, 28, 29, 30, 31, 32
+);
 
 macro_rules! deep_size_tuple {
     ($(($n:tt, $T:ident)),+ ) => {
@@ -177,6 +175,36 @@ deep_size_tuple!((0, A), (1, B), (2, C), (3, D));
 deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E));
 deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F));
 deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G));
-deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H));
-deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H), (8, I));
-deep_size_tuple!((0, A), (1, B), (2, C), (3, D), (4, E), (5, F), (6, G), (7, H), (8, I), (9, J));
+deep_size_tuple!(
+    (0, A),
+    (1, B),
+    (2, C),
+    (3, D),
+    (4, E),
+    (5, F),
+    (6, G),
+    (7, H)
+);
+deep_size_tuple!(
+    (0, A),
+    (1, B),
+    (2, C),
+    (3, D),
+    (4, E),
+    (5, F),
+    (6, G),
+    (7, H),
+    (8, I)
+);
+deep_size_tuple!(
+    (0, A),
+    (1, B),
+    (2, C),
+    (3, D),
+    (4, E),
+    (5, F),
+    (6, G),
+    (7, H),
+    (8, I),
+    (9, J)
+);

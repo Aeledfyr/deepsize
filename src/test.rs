@@ -1,7 +1,7 @@
 use crate::known_deep_size;
 use crate::DeepSizeOf;
 
-use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, vec};
 use core::mem::size_of;
 
 #[test]
@@ -23,7 +23,7 @@ fn primitive_types() {
 
     assert_eq!('f'.deep_size_of(), 4);
     assert_eq!("Hello World!".deep_size_of(), 12);
-    assert_eq!((&"Hello World!").deep_size_of(), 28);
+    assert_eq!((&"Hello World!").deep_size_of(), 16);
     assert_eq!(true.deep_size_of(), 1);
 }
 
@@ -39,17 +39,20 @@ fn arcs() {
     let test: Arc<[u32]> = vec![1, 2, 3].into();
     let multiple = (Arc::clone(&test), Arc::clone(&test), test);
 
-    assert_eq!(multiple.deep_size_of(), 3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>());
+    assert_eq!(
+        multiple.deep_size_of(),
+        3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>()
+    );
 }
 
 #[test]
 fn slices() {
-    let array: [u32; 64] = [0; 64];
+    let array: Box<[u32]> = vec![0; 64].into_boxed_slice();
     assert_eq!(array[5..10].deep_size_of(), 4 * 5);
     assert_eq!(array[..32].deep_size_of(), 4 * 32);
     assert_eq!(
-        DeepSizeOf::deep_size_of(&&array[..8]),
-        4 * 8 + size_of::<usize>() * 2
+        DeepSizeOf::deep_size_of(&array),
+        size_of::<usize>() * 2 + size_of::<[u32; 64]>()
     );
 }
 
@@ -58,10 +61,10 @@ fn slices() {
 fn alignment() {
     #[repr(align(256))]
     struct Test(u8);
-    known_deep_size!(0, Test);
+    known_deep_size!(0; Test);
 
     struct Test2(Test, u8);
-    known_deep_size!(0, Test2);
+    known_deep_size!(0; Test2);
 
     let array: [Test; 3] = [Test(5), Test(16), Test(2)];
     assert_eq!(size_of::<[Test; 3]>(), array.deep_size_of());
@@ -121,16 +124,6 @@ mod context_tests {
         context.add_rc(&rc);
         assert_eq!(context.contains_rc(&rc), true);
     }
-
-    #[test]
-    fn context_ref_test() {
-        let mut context = Context::new();
-
-        let number = &42;
-        assert_eq!(context.contains_ref(number), false);
-        context.add_ref(number);
-        assert_eq!(context.contains_ref(number), true);
-    }
 }
 
 #[cfg(feature = "derive")]
@@ -146,7 +139,8 @@ mod test_derive {
         let example = Example(number, number);
 
         let size = example.deep_size_of();
-        assert_eq!(size, 2 * size_of::<usize>() + 4);
+        // Data past references is not counted
+        assert_eq!(size, 2 * size_of::<usize>());
     }
 
     #[test]

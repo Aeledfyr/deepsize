@@ -14,4 +14,3 @@ fn main() {
 
     assert_eq!(object.deep_size_of(), std::mem::size_of::<Test>() + 1);
 }
-

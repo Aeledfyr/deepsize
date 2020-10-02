@@ -15,22 +15,20 @@
 //!     b: Box<u8>,
 //! }
 //!
-//! fn main() {
-//!     let object = Test {
-//!         a: 15,
-//!         b: Box::new(255),
-//!     };
+//! let object = Test {
+//!     a: 15,
+//!     b: Box::new(255),
+//! };
 //!
-//!     // The stack size of the struct:
-//!     //    The size of a u32 (4)
-//!     //    4 bytes padding (64 bit only)
-//!     //    The stack size of the Box (a usize pointer, 32 or 64 bits: 4 or 8 bytes)
-//!     // + the size of a u8 (1), the Box's heap storage
-//!     #[cfg(target_pointer_width = "64")]
-//!     assert_eq!(object.deep_size_of(), 17);
-//!     #[cfg(target_pointer_width = "32")]
-//!     assert_eq!(object.deep_size_of(), 9);
-//! }
+//! // The stack size of the struct:
+//! //    The size of a u32 (4)
+//! //    4 bytes padding (64 bit only)
+//! //    The stack size of the Box (a usize pointer, 32 or 64 bits: 4 or 8 bytes)
+//! // + the size of a u8 (1), the Box's heap storage
+//! #[cfg(target_pointer_width = "64")]
+//! assert_eq!(object.deep_size_of(), 17);
+//! #[cfg(target_pointer_width = "32")]
+//! assert_eq!(object.deep_size_of(), 9);
 //! ```
 //!
 
@@ -60,7 +58,7 @@ pub trait DeepSizeOf {
     /// Returns an estimation of a total size of memory owned by the
     /// object, including heap-managed storage.
     ///
-    /// This is an estimation and not a precise result, because it
+    /// This is an estimation and not a precise result because it
     /// doesn't account for allocator's overhead.
     ///
     /// ```rust
@@ -73,19 +71,22 @@ pub trait DeepSizeOf {
     /// map.push((Box::new(0u32),  String::from("A string")));
     /// map.push((Box::new(255u32), String::from("Dynamically Allocated!")));
     ///
-    /// assert_eq!(map.deep_size_of(), 
+    /// assert_eq!(map.deep_size_of(),
     ///     std::mem::size_of::<Vec<(Box<u32>, String)>>() +
     ///     4 * std::mem::size_of::<(Box<u32>, String)>() +
-    ///     4 * std::mem::size_of::<u32>() + 
+    ///     4 * std::mem::size_of::<u32>() +
     ///     11 + 9 + 8 + 22
     /// );
     /// ```
     fn deep_size_of(&self) -> usize {
         size_of_val(self) + self.deep_size_of_children(&mut Context::new())
     }
-    
+
     /// Deprecated: equivalent to `std::mem::size_of_val(val) + val.deep_size_of_children()`
-    #[deprecated(since="0.1.1", note="use `std::mem::size_of_val(val) + val.deep_size_of_children()` instead")]
+    #[deprecated(
+        since = "0.1.1",
+        note = "use `std::mem::size_of_val(val) + val.deep_size_of_children()` instead"
+    )]
     fn recurse_deep_size_of(&self, context: &mut Context) -> usize {
         size_of_val(self) + self.deep_size_of_children(context)
     }
@@ -110,13 +111,13 @@ pub trait DeepSizeOf {
     ///
     /// The most common way to use this method, and how the derive works,
     /// is to call this method on each of the structs members and sum the
-    /// results, which works as long as all members of the struct implmeent
-    /// DeepSizeOf.
+    /// results, which works as long as all members of the struct implement
+    /// `DeepSizeOf`.
     ///
     /// To implement this for a collection type, you should sum the deep sizes of
     /// the items of the collection and then add the size of the allocation of the
     /// collection itself.  This can become much more complicated if the collection
-    /// has multiple seperate allocations.
+    /// has multiple separate allocations.
     ///
     /// Here is an example from the implementation of `DeepSizeOf` for `Vec<T>`
     /// ```rust, ignore
@@ -149,68 +150,60 @@ use std::collections::HashSet as GenericSet;
 ///
 /// Currently this counts each reference once, although there are arguments for
 /// only counting owned data and ignoring partial ownership, or for counting
-/// partial refernces such as Arc as its size divided by the strong reference count.
+/// partial references such as Arc as its size divided by the strong reference count.
 ///
-/// [Github Issue discussion here](https://github.com/dtolnay/request-for-implementation/issues/22)
+/// [Github issue discussion here](https://github.com/dtolnay/request-for-implementation/issues/22)
 ///
 /// This must be passed between `deep_size_of_children` calls when
-/// recursing, so that references are not double-counted.
+/// recursing, so that references are not counted multiple timse.
 #[derive(Debug)]
 pub struct Context {
-    /// A set of all [`Arcs`](std::sync::Arc) that have already been counted
+    /// A set of all [`Arc`](std::sync::Arc)s that have already been counted
     arcs: GenericSet<usize>,
-    /// A set of all [`Rcs`](std::sync::Arc) that have already been counted
+    /// A set of all [`Rc`](std::sync::Arc)s that have already been counted
     rcs: GenericSet<usize>,
     /// A set of all normal references that have already been counted
     refs: GenericSet<usize>,
 }
 
 impl Context {
-    /// Creates a new empty context for use in the deep_size functions
+    /// Creates a new empty context for use in the `deep_size` functions
     fn new() -> Self {
         Self {
             arcs: GenericSet::new(),
-            rcs:  GenericSet::new(),
+            rcs: GenericSet::new(),
             refs: GenericSet::new(),
         }
     }
 
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
     fn add_arc<T>(&mut self, arc: &alloc::sync::Arc<T>) {
-        // Somewhat unsafe way of getting a pointer to the inner `ArcInner`
-        // object without changing the count
-        let pointer: usize = unsafe { *(arc as *const alloc::sync::Arc<T> as *const usize) };
-        self.arcs.insert(pointer);
+        self.arcs.insert(&**arc as *const T as usize);
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
     fn contains_arc<T>(&self, arc: &alloc::sync::Arc<T>) -> bool {
-        let pointer: usize = unsafe { *(arc as *const alloc::sync::Arc<T> as *const usize) };
-        self.arcs.contains(&pointer)
+        self.arcs.contains(&(&**arc as *const T as usize))
     }
 
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn add_rc<T>(&mut self, rc: &alloc::rc::Rc<T>) {
-        // Somewhat unsafe way of getting a pointer to the inner `RcBox`
-        // object without changing the count
-        let pointer: usize = unsafe { *(rc as *const alloc::rc::Rc<T> as *const usize) };
-        self.rcs.insert(pointer);
+        self.rcs.insert(&**rc as *const T as usize);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn contains_rc<T>(&self, rc: &alloc::rc::Rc<T>) -> bool {
-        let pointer: usize = unsafe { *(rc as *const alloc::rc::Rc<T> as *const usize) };
-        self.rcs.contains(&pointer)
+        self.rcs.contains(&(&**rc as *const T as usize))
     }
 
     /// Adds a [`reference`](std::reference) to the list of visited [`reference`](std::reference)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     fn add_ref<T>(&mut self, reference: &T) {
-        let pointer: usize = reference as *const _ as usize;
+        let pointer: usize = reference as *const T as usize;
         self.refs.insert(pointer);
     }
     /// Checks if a [`reference`](std::reference) is in the list of visited [`reference`](std::reference)s
     fn contains_ref<T>(&self, reference: &T) -> bool {
-        let pointer: usize = reference as *const _ as usize;
+        let pointer: usize = reference as *const T as usize;
         self.refs.contains(&pointer)
     }
 }
@@ -247,8 +240,10 @@ where
     /// assert_eq!(vec.deep_size_of(), 24 + vec.capacity() * 8 + 13 * 8);
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter().map(|child| child.deep_size_of_children(context)).sum::<usize>()
-         + self.capacity() * size_of::<T>()
+        self.iter()
+            .map(|child| child.deep_size_of_children(context))
+            .sum::<usize>()
+            + self.capacity() * size_of::<T>()
         // Size of unused capacity
     }
 }
@@ -290,8 +285,10 @@ where
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         // Deep size of children
-        self.iter().map(|child| child.deep_size_of_children(context)).sum::<usize>()
-         + self.capacity() * size_of::<T>()  // Size of Vec's heap allocation
+        self.iter()
+            .map(|child| child.deep_size_of_children(context))
+            .sum::<usize>()
+            + self.capacity() * size_of::<T>() // Size of Vec's heap allocation
     }
 }
 
@@ -317,8 +314,8 @@ where
     /// ```
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter().fold(0, |sum, child| {
-            sum + size_of_val(child) + child.deep_size_of_children(context)
-             + size_of::<usize>() * 2 // overhead of each node
+            sum + size_of_val(child) + child.deep_size_of_children(context) + size_of::<usize>() * 2
+            // overhead of each node
         })
     }
 }
@@ -328,19 +325,16 @@ impl<K, V, S> DeepSizeOf for std::collections::HashMap<K, V, S>
 where
     K: DeepSizeOf + Eq + std::hash::Hash,
     V: DeepSizeOf,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     // FIXME
     // How much more overhead is there to a hashmap? The docs say it is
     // essensially just a Vec<Option<(u64, K, V)>>
     // Update this to work for hashbrown::HashMap
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter()
-            .fold(0, |sum, (key, val)| {
-                sum + key.deep_size_of_children(context)
-                    + val.deep_size_of_children(context)
-            })
-         + self.capacity() * size_of::<Option<(u64, K, V)>>()
+        self.iter().fold(0, |sum, (key, val)| {
+            sum + key.deep_size_of_children(context) + val.deep_size_of_children(context)
+        }) + self.capacity() * size_of::<Option<(u64, K, V)>>()
         // Size of container capacity
     }
 }
@@ -349,7 +343,7 @@ where
 impl<T, S> DeepSizeOf for std::collections::HashSet<T, S>
 where
     T: DeepSizeOf + Eq + std::hash::Hash,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         self.iter()
@@ -364,7 +358,6 @@ where
     T: DeepSizeOf,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        // May cause inacuracies, measures size of the value, but not the allocation size
         let val: &T = &*self;
         size_of_val(val) + val.deep_size_of_children(context)
     }
@@ -420,6 +413,8 @@ where
     T: DeepSizeOf,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
-        self.iter().map(|child| child.deep_size_of_children(context)).sum()
+        self.iter()
+            .map(|child| child.deep_size_of_children(context))
+            .sum()
     }
 }

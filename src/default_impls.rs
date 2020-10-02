@@ -15,7 +15,6 @@ use crate::{Context, DeepSizeOf};
 /// known_deep_size!(4, C); // C will always have an allocation of 4 bytes
 /// # }
 /// ```
-/// 
 #[macro_export]
 macro_rules! known_deep_size(
     ($size:expr, $($type:ty),+) => (
@@ -77,12 +76,11 @@ impl<T: DeepSizeOf> DeepSizeOf for core::option::Option<T> {
 impl<R: DeepSizeOf, E: DeepSizeOf> DeepSizeOf for core::result::Result<R, E> {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         match &self {
-            Ok(r)  => r.deep_size_of_children(context),
+            Ok(r) => r.deep_size_of_children(context),
             Err(e) => e.deep_size_of_children(context),
         }
     }
 }
-
 
 macro_rules! deep_size_array {
     ($num:expr) => {
@@ -95,6 +93,7 @@ macro_rules! deep_size_array {
 }
 
 // Can't wait for const generics
+// A year and a half later, still waiting
 deep_size_array!(1);
 deep_size_array!(2);
 deep_size_array!(3);

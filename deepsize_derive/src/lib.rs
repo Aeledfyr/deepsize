@@ -1,7 +1,8 @@
-//! A basic DeepSizeOf Derive implementation
+//! A basic [`DeepSizeOf`](deepsize::DeepSizeOf) Derive implementation
 //!
-//! Mainly from `syn`'s heap_size derive example:
-//! https://github.com/dtolnay/syn/commits/master/examples/heapsize/heapsize_derive/src/lib.rs
+//! Mainly from `syn`'s [`heap_size` derive example][heap_size]
+//!
+//! [heap_size]: https://github.com/dtolnay/syn/commits/master/examples/heapsize/heapsize_derive/src/lib.rs
 
 extern crate proc_macro;
 
@@ -136,26 +137,23 @@ fn get_matcher(var: &syn::Variant) -> TokenStream {
             quote!({#fields})
         }
     };
-                                
+
     quote!(#matcher)
 }
 
 /// Generate an expression to sum up the size of each field.
 fn deepsize_sum(data: &Data, struct_name: &proc_macro2::Ident) -> TokenStream {
     match *data {
-        Data::Struct(ref inner) => {
-            match_fields(&inner.fields)
-        }
+        Data::Struct(ref inner) => match_fields(&inner.fields),
         Data::Enum(ref inner) => {
-            let arms = inner.variants.iter()
-                .map(|var| {
-                    let matcher = get_matcher(var);
-                    let output = match_enum_fields(&var.fields);
-                    let name = &var.ident;
-                    let ident = quote!(#struct_name::#name);
-                    quote!(#ident #matcher => #output,)
-                });
-            
+            let arms = inner.variants.iter().map(|var| {
+                let matcher = get_matcher(var);
+                let output = match_enum_fields(&var.fields);
+                let name = &var.ident;
+                let ident = quote!(#struct_name::#name);
+                quote!(#ident #matcher => #output,)
+            });
+
             quote! {
                 match self {
                     #(#arms)*

@@ -17,6 +17,9 @@ use crate::{Context, DeepSizeOf};
 /// ```
 #[macro_export]
 macro_rules! known_deep_size(
+    ($size:expr, $($type:ty,)+) => (
+        known_deep_size!($size, $($type),*);
+    );
     ($size:expr, $($type:ty),+) => (
         $(
             impl $crate::DeepSizeOf for $type {
@@ -26,6 +29,9 @@ macro_rules! known_deep_size(
                 }
             }
         )+
+    );
+    ($size:expr, $($type:ident<$($gen:ident),+>,)+) => (
+        known_deep_size!($size, $($type<$($gen),+>),*);
     );
     ($size:expr, $($type:ident<$($gen:ident),+>),+) => (
         $(
@@ -39,6 +45,9 @@ macro_rules! known_deep_size(
     );
 );
 
+use core::sync::atomic;
+use core::num;
+
 known_deep_size!(0, bool, char, str);
 known_deep_size!(0, u8, u16, u32, u64, usize);
 known_deep_size!(0, i8, i16, i32, i64, isize);
@@ -46,9 +55,30 @@ known_deep_size!(0, f32, f64);
 known_deep_size!(0, ());
 known_deep_size!(
     0,
-    core::sync::atomic::AtomicBool,
-    core::sync::atomic::AtomicIsize,
-    core::sync::atomic::AtomicUsize
+    atomic::AtomicBool,
+    atomic::AtomicI8,
+    atomic::AtomicI16,
+    atomic::AtomicI32,
+    atomic::AtomicI64,
+    atomic::AtomicIsize,
+    atomic::AtomicU8,
+    atomic::AtomicU16,
+    atomic::AtomicU32,
+    atomic::AtomicU64,
+    atomic::AtomicUsize,
+
+    num::NonZeroI8,
+    num::NonZeroI16,
+    num::NonZeroI32,
+    num::NonZeroI64,
+    num::NonZeroI128,
+    num::NonZeroIsize,
+    num::NonZeroU8,
+    num::NonZeroU16,
+    num::NonZeroU32,
+    num::NonZeroU64,
+    num::NonZeroU128,
+    num::NonZeroUsize,
 );
 
 impl<T: ?Sized> DeepSizeOf for core::marker::PhantomData<T> {
@@ -94,6 +124,7 @@ macro_rules! deep_size_array {
 
 // Can't wait for const generics
 // A year and a half later, still waiting
+deep_size_array!(0);
 deep_size_array!(1);
 deep_size_array!(2);
 deep_size_array!(3);

@@ -177,33 +177,33 @@ impl Context {
     }
 
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
-    fn add_arc<T>(&mut self, arc: &alloc::sync::Arc<T>) {
-        self.arcs.insert(&**arc as *const T as usize);
+    fn add_arc<T: ?Sized>(&mut self, arc: &alloc::sync::Arc<T>) {
+        self.arcs.insert(&**arc as *const T as *const u8 as usize);
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
-    fn contains_arc<T>(&self, arc: &alloc::sync::Arc<T>) -> bool {
-        self.arcs.contains(&(&**arc as *const T as usize))
+    fn contains_arc<T: ?Sized>(&self, arc: &alloc::sync::Arc<T>) -> bool {
+        self.arcs.contains(&(&**arc as *const T as *const u8 as usize))
     }
 
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn add_rc<T>(&mut self, rc: &alloc::rc::Rc<T>) {
-        self.rcs.insert(&**rc as *const T as usize);
+    fn add_rc<T: ?Sized>(&mut self, rc: &alloc::rc::Rc<T>) {
+        self.rcs.insert(&**rc as *const T as *const u8 as usize);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn contains_rc<T>(&self, rc: &alloc::rc::Rc<T>) -> bool {
-        self.rcs.contains(&(&**rc as *const T as usize))
+    fn contains_rc<T: ?Sized>(&self, rc: &alloc::rc::Rc<T>) -> bool {
+        self.rcs.contains(&(&**rc as *const T as *const u8 as usize))
     }
 
     /// Adds a [`reference`](std::reference) to the list of visited [`reference`](std::reference)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
-    fn add_ref<T>(&mut self, reference: &T) {
-        let pointer: usize = reference as *const T as usize;
+    fn add_ref<T: ?Sized>(&mut self, reference: &T) {
+        let pointer: usize = reference as *const T as *const u8 as usize;
         self.refs.insert(pointer);
     }
     /// Checks if a [`reference`](std::reference) is in the list of visited [`reference`](std::reference)s
     fn contains_ref<T>(&self, reference: &T) -> bool {
-        let pointer: usize = reference as *const T as usize;
+        let pointer: usize = reference as *const T as *const u8 as usize;
         self.refs.contains(&pointer)
     }
 }
@@ -355,7 +355,7 @@ where
 
 impl<T> DeepSizeOf for alloc::boxed::Box<T>
 where
-    T: DeepSizeOf,
+    T: DeepSizeOf + ?Sized,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         let val: &T = &*self;
@@ -365,7 +365,7 @@ where
 
 impl<T> DeepSizeOf for alloc::sync::Arc<T>
 where
-    T: DeepSizeOf,
+    T: DeepSizeOf + ?Sized,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         if context.contains_arc(self) {
@@ -381,7 +381,7 @@ where
 
 impl<T> DeepSizeOf for alloc::rc::Rc<T>
 where
-    T: DeepSizeOf,
+    T: DeepSizeOf + ?Sized,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         if context.contains_rc(self) {
@@ -394,9 +394,9 @@ where
     }
 }
 
-impl<T: ?Sized> DeepSizeOf for &T
+impl<T> DeepSizeOf for &T
 where
-    T: DeepSizeOf,
+    T: DeepSizeOf + ?Sized,
 {
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         if context.contains_ref(&self) {

@@ -34,6 +34,15 @@ fn boxes() {
 }
 
 #[test]
+fn arcs() {
+    use std::sync::Arc;
+    let test: Arc<[u32]> = vec![1, 2, 3].into();
+    let multiple = (Arc::clone(&test), Arc::clone(&test), test);
+
+    assert_eq!(multiple.deep_size_of(), 3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>());
+}
+
+#[test]
 fn slices() {
     let array: [u32; 64] = [0; 64];
     assert_eq!(array[5..10].deep_size_of(), 4 * 5);

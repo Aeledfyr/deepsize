@@ -30,10 +30,11 @@ references, and are not counted.
 
 * `slotmap`: (version 0.4)
 * `slab`: (version 0.4)
+* `indexmap`: (version 1)
 * `arrayvec`: (version 0.5)
 * `smallvec`: (version 1)
 * `hashbrown`: (version 0.9)
-
+* `chrono`: (version 0.4)
 
 ## Example Code
 

@@ -453,11 +453,3 @@ where
             .sum()
     }
 }
-
-/*
-To add:
-std::collections::BTreeMap
-owning_ref::OwningRef
-std::path::PathBuf, std::path::Path
-num::BigUint, num::BigInt
-*/

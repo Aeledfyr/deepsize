@@ -1,9 +1,9 @@
-#[cfg(features = "slotmap")]
+#[cfg(feature = "slotmap")]
 mod slotmap_impl {
     use crate::{known_deep_size, Context, DeepSizeOf};
     use core::mem::size_of;
 
-    known_deep_size!(0, slotmap::KeyData, slotmap::DefaultKey);
+    known_deep_size!(0; slotmap::KeyData, slotmap::DefaultKey);
 
     impl<K, V> DeepSizeOf for slotmap::SlotMap<K, V>
     where
@@ -18,7 +18,7 @@ mod slotmap_impl {
     }
 }
 
-#[cfg(features = "slab")]
+#[cfg(feature = "slab")]
 mod slab_impl {
     use crate::{Context, DeepSizeOf};
     use core::mem::size_of;
@@ -43,7 +43,7 @@ mod slab_impl {
     }
 }
 
-#[cfg(features = "arrayvec")]
+#[cfg(feature = "arrayvec")]
 mod arrayvec_impl {
     use crate::{known_deep_size, Context, DeepSizeOf};
 
@@ -58,10 +58,10 @@ mod arrayvec_impl {
         }
     }
 
-    known_deep_size!(0, { A: arrayvec::Array<Item=u8> + Copy } arrayvec::ArrayString<A>);
+    known_deep_size!(0; { A: arrayvec::Array<Item=u8> + Copy } arrayvec::ArrayString<A>);
 }
 
-#[cfg(features = "smallvec")]
+#[cfg(feature = "smallvec")]
 mod smallvec_impl {
     use crate::{Context, DeepSizeOf};
     use core::mem::size_of;
@@ -84,7 +84,7 @@ mod smallvec_impl {
     }
 }
 
-#[cfg(features = "hashbrown")]
+#[cfg(feature = "hashbrown")]
 mod hashbrown_impl {
     use crate::{Context, DeepSizeOf};
     use core::mem::size_of;
@@ -119,4 +119,52 @@ mod hashbrown_impl {
                 + self.capacity() * size_of::<K>()
         }
     }
+}
+
+#[cfg(feature = "indexmap")]
+mod indexmap_impl {
+    use crate::{Context, DeepSizeOf};
+    use core::mem::size_of;
+    use indexmap::{IndexMap, IndexSet};
+
+    // IndexMap uses a vec of buckets (usize, K, V) as backing, with
+    // a hashbrown::RawTable<usize> for lookups.  This method will
+    // consistently underestimate, because IndexMap::capacity will
+    // return the min of the capacity of the buckets list and the
+    // capacity of the raw table.
+    impl<K, V, S> DeepSizeOf for IndexMap<K, V, S>
+        where K: DeepSizeOf, V: DeepSizeOf
+    {
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            let child_sizes = self.iter().fold(0, |sum, (key, val)| {
+                sum + key.deep_size_of_children(context) + val.deep_size_of_children(context)
+            });
+            let map_size = self.capacity() * (size_of::<(usize, K, V)>() + size_of::<usize>());
+            child_sizes + map_size
+        }
+    }
+    impl<K, S> DeepSizeOf for IndexSet<K, S>
+        where K: DeepSizeOf
+    {
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            let child_sizes = self.iter().fold(0, |sum, key| {
+                sum + key.deep_size_of_children(context)
+            });
+            let map_size = self.capacity() * (size_of::<(usize, K, ())>() + size_of::<usize>());
+            child_sizes + map_size
+        }
+    }
+}
+
+#[cfg(feature = "chrono")]
+mod chrono_impl {
+    use crate::known_deep_size;
+    use chrono::*;
+
+    known_deep_size!(0;
+        NaiveDate, NaiveTime, NaiveDateTime, IsoWeek,
+        Duration, Month, Weekday,
+        FixedOffset, Local, Utc,
+        {T: TimeZone} DateTime<T>, {T: TimeZone} Date<T>,
+    );
 }

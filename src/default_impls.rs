@@ -79,6 +79,36 @@ known_deep_size!(0;
     {T} alloc::rc::Weak<T>,
 );
 
+#[cfg(feature = "std")]
+mod strings {
+    use super::{DeepSizeOf, Context};
+    use std::ffi::{OsString, OsStr, CString, CStr};
+    use std::path::{PathBuf, Path};
+
+    known_deep_size!(0; Path, OsStr, CStr);
+
+    impl DeepSizeOf for PathBuf {
+        fn deep_size_of_children(&self, _: &mut Context) -> usize {
+            self.capacity()
+        }
+    }
+    impl DeepSizeOf for OsString {
+        fn deep_size_of_children(&self, _: &mut Context) -> usize {
+            self.capacity()
+        }
+    }
+    impl DeepSizeOf for CString {
+        fn deep_size_of_children(&self, _: &mut Context) -> usize {
+            // This may cause a length check at runtime, but that
+            // doesn't seem avoidable.  This assumes that the allocation
+            // is the exact length of the string and the added null
+            // terminator.
+            self.as_bytes().len() + 1
+        }
+    }
+}
+
+
 impl DeepSizeOf for alloc::string::String {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {
         self.capacity()

@@ -1,6 +1,6 @@
 [package]
 name = "deepsize"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Aeledfyr <aeledfyr@gmail.com>"]
 license = "MIT"
 description = "A crate for measuring the total size of object on the stack and heap"

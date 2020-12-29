@@ -39,6 +39,8 @@ references, and are not counted.
 ## Example Code
 
 ```rust
+use std::mem::size_of;
+
 use deepsize::DeepSizeOf;
 
 #[derive(DeepSizeOf)]
@@ -50,7 +52,7 @@ struct Test {
 fn main() {
     let object = Test {
         a: 15,
-        b: Box::new(b"Hello, Wold!"),
+        b: Box::new(*b"Hello, Wold!"),
     };
     
     assert_eq!(object.deep_size_of(), size_of::<Test>() + size_of::<u8>() * 12);

@@ -133,7 +133,9 @@ mod indexmap_impl {
     // return the min of the capacity of the buckets list and the
     // capacity of the raw table.
     impl<K, V, S> DeepSizeOf for IndexMap<K, V, S>
-        where K: DeepSizeOf, V: DeepSizeOf
+    where
+        K: DeepSizeOf,
+        V: DeepSizeOf,
     {
         fn deep_size_of_children(&self, context: &mut Context) -> usize {
             let child_sizes = self.iter().fold(0, |sum, (key, val)| {
@@ -144,12 +146,13 @@ mod indexmap_impl {
         }
     }
     impl<K, S> DeepSizeOf for IndexSet<K, S>
-        where K: DeepSizeOf
+    where
+        K: DeepSizeOf,
     {
         fn deep_size_of_children(&self, context: &mut Context) -> usize {
-            let child_sizes = self.iter().fold(0, |sum, key| {
-                sum + key.deep_size_of_children(context)
-            });
+            let child_sizes = self
+                .iter()
+                .fold(0, |sum, key| sum + key.deep_size_of_children(context));
             let map_size = self.capacity() * (size_of::<(usize, K, ())>() + size_of::<usize>());
             child_sizes + map_size
         }

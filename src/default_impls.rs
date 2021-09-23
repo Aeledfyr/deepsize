@@ -81,9 +81,9 @@ known_deep_size!(0;
 
 #[cfg(feature = "std")]
 mod strings {
-    use super::{DeepSizeOf, Context};
-    use std::ffi::{OsString, OsStr, CString, CStr};
-    use std::path::{PathBuf, Path};
+    use super::{Context, DeepSizeOf};
+    use std::ffi::{CStr, CString, OsStr, OsString};
+    use std::path::{Path, PathBuf};
 
     known_deep_size!(0; Path, OsStr, CStr);
 
@@ -107,7 +107,6 @@ mod strings {
         }
     }
 }
-
 
 impl DeepSizeOf for alloc::string::String {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {
@@ -164,27 +163,11 @@ mod std_sync {
     }
 }
 
-macro_rules! deep_size_array {
-    ($($num:expr,)+) => {
-        deep_size_array!($($num),+);
-    };
-    ($($num:expr),+) => {
-        $(
-            impl<T: DeepSizeOf> DeepSizeOf for [T; $num] {
-                fn deep_size_of_children(&self, context: &mut Context) -> usize {
-                    self.as_ref().deep_size_of_children(context)
-                }
-            }
-        )+
-    };
+impl<T: DeepSizeOf, const N: usize> DeepSizeOf for [T; N] {
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        self.as_ref().deep_size_of_children(context)
+    }
 }
-
-// Can't wait for const generics
-// A year and a half later, still waiting
-deep_size_array!(
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-    26, 27, 28, 29, 30, 31, 32
-);
 
 macro_rules! deep_size_tuple {
     ($(($n:tt, $T:ident)),+ ) => {

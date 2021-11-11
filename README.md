@@ -35,6 +35,8 @@ references, and are not counted.
 * `smallvec`: (version 1)
 * `hashbrown`: (version 0.9)
 * `chrono`: (version 0.4)
+* `actix`: (version 0.11)
+* `tokio`: (version 1.1)
 
 ## Example Code
 
@@ -54,7 +56,7 @@ fn main() {
         a: 15,
         b: Box::new(*b"Hello, Wold!"),
     };
-    
+
     assert_eq!(object.deep_size_of(), size_of::<Test>() + size_of::<u8>() * 12);
 }
 ```

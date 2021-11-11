@@ -171,3 +171,26 @@ mod chrono_impl {
         {T: TimeZone} DateTime<T>, {T: TimeZone} Date<T>,
     );
 }
+
+#[cfg(feature = "tokio_net")]
+mod tokio_net_impl {
+    use crate::known_deep_size;
+    use tokio::net::{TcpListener, TcpStream, UdpSocket, UnixDatagram, UnixListener, UnixStream};
+
+    known_deep_size!(0;
+        TcpListener, TcpStream, UdpSocket,
+        UnixDatagram, UnixListener, UnixStream
+    );
+}
+
+#[cfg(feature = "actix")]
+mod actix_impl {
+    use crate::{Context, DeepSizeOf};
+    use actix::Addr;
+
+    impl<T: actix::Actor> DeepSizeOf for Addr<T> {
+        fn deep_size_of_children(&self, _context: &mut Context) -> usize {
+            0
+        }
+    }
+}

@@ -139,6 +139,25 @@ impl<T: DeepSizeOf> DeepSizeOf for core::cell::RefCell<T> {
 }
 
 #[cfg(feature = "std")]
+mod std_time {
+    use std::time::{Instant, Duration, SystemTime, SystemTimeError};
+
+    known_deep_size!(0;
+        Instant, Duration, SystemTime, SystemTimeError
+    );
+}
+
+#[cfg(feature = "std")]
+mod std_net {
+    use std::net::*;
+
+    known_deep_size!(0;
+        SocketAddr, IpAddr, AddrParseError, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6,
+        TcpListener, TcpStream, UdpSocket
+    );
+}
+
+#[cfg(feature = "std")]
 mod std_sync {
     use crate::{Context, DeepSizeOf};
 
@@ -182,7 +201,7 @@ macro_rules! deep_size_array {
 // A year and a half later, still waiting
 deep_size_array!(
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-    26, 27, 28, 29, 30, 31, 32
+    26, 27, 28, 29, 30, 31, 32, 64, 65
 );
 
 macro_rules! deep_size_tuple {

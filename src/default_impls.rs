@@ -152,7 +152,8 @@ mod std_net {
     use std::net::*;
 
     known_deep_size!(0;
-        SocketAddr, IpAddr, AddrParseError, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6,
+        SocketAddr, IpAddr, AddrParseError, Ipv4Addr,
+        Ipv6Addr, SocketAddrV4, SocketAddrV6,
         TcpListener, TcpStream, UdpSocket
     );
 }

@@ -139,22 +139,25 @@ impl<T: DeepSizeOf> DeepSizeOf for core::cell::RefCell<T> {
 }
 
 #[cfg(feature = "std")]
+mod std_net {
+    use std::net::*;
+
+    known_deep_size!(0;
+        // structs
+        AddrParseError, Ipv4Addr,
+        Ipv6Addr, SocketAddrV4, SocketAddrV6,
+        TcpListener, TcpStream, UdpSocket,
+        // enums
+        IpAddr, Shutdown, SocketAddr
+    );
+}
+
+#[cfg(feature = "std")]
 mod std_time {
     use std::time::{Instant, Duration, SystemTime, SystemTimeError};
 
     known_deep_size!(0;
         Instant, Duration, SystemTime, SystemTimeError
-    );
-}
-
-#[cfg(feature = "std")]
-mod std_net {
-    use std::net::*;
-
-    known_deep_size!(0;
-        SocketAddr, IpAddr, AddrParseError, Ipv4Addr,
-        Ipv6Addr, SocketAddrV4, SocketAddrV6,
-        TcpListener, TcpStream, UdpSocket
     );
 }
 

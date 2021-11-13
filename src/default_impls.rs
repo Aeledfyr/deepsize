@@ -81,9 +81,9 @@ known_deep_size!(0;
 
 #[cfg(feature = "std")]
 mod strings {
-    use super::{DeepSizeOf, Context};
-    use std::ffi::{OsString, OsStr, CString, CStr};
-    use std::path::{PathBuf, Path};
+    use super::{Context, DeepSizeOf};
+    use std::ffi::{CStr, CString, OsStr, OsString};
+    use std::path::{Path, PathBuf};
 
     known_deep_size!(0; Path, OsStr, CStr);
 
@@ -107,7 +107,6 @@ mod strings {
         }
     }
 }
-
 
 impl DeepSizeOf for alloc::string::String {
     fn deep_size_of_children(&self, _: &mut Context) -> usize {

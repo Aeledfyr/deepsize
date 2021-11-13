@@ -139,6 +139,32 @@ impl<T: DeepSizeOf> DeepSizeOf for core::cell::RefCell<T> {
 }
 
 #[cfg(feature = "std")]
+mod std_net {
+    use std::net::{
+        AddrParseError, IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4,
+        SocketAddrV6, TcpListener, TcpStream, UdpSocket,
+    };
+
+    known_deep_size!(0;
+        // structs
+        AddrParseError, Ipv4Addr,
+        Ipv6Addr, SocketAddrV4, SocketAddrV6,
+        TcpListener, TcpStream, UdpSocket,
+        // enums
+        IpAddr, Shutdown, SocketAddr
+    );
+}
+
+#[cfg(feature = "std")]
+mod std_time {
+    use std::time::{Duration, Instant, SystemTime, SystemTimeError};
+
+    known_deep_size!(0;
+        Instant, Duration, SystemTime, SystemTimeError
+    );
+}
+
+#[cfg(feature = "std")]
 mod std_sync {
     use crate::{Context, DeepSizeOf};
 

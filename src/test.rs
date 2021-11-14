@@ -3,6 +3,7 @@ use crate::DeepSizeOf;
 
 use alloc::{boxed::Box, string::String, vec};
 use core::mem::size_of;
+use std::convert::TryInto;
 
 #[test]
 fn primitive_types() {
@@ -55,10 +56,11 @@ fn slices() {
         size_of::<usize>() * 2 + size_of::<[u32; 64]>()
     );
 
-    let array: Box<[u32]> = vec![0; 1000].into_boxed_slice();
+    let array: Box<[u32; 1000]> = vec![0; 1000].into_boxed_slice().try_into().unwrap();
+
     assert_eq!(
         DeepSizeOf::deep_size_of(&array),
-        size_of::<usize>() * 2 + size_of::<[u32; 1000]>()
+        size_of::<usize>() + size_of::<[u32; 1000]>()
     );
 }
 

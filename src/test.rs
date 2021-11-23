@@ -35,7 +35,6 @@ fn boxes() {
 }
 
 #[test]
-#[cfg(not(feature="no_context"))]
 fn arcs() {
     use std::sync::Arc;
     let test: Arc<[u32]> = vec![1, 2, 3].into();
@@ -48,14 +47,13 @@ fn arcs() {
 }
 
 #[test]
-#[cfg(feature="no_context")]
-fn arcs() {
+fn arcs_no_cycle_check() {
     use std::sync::Arc;
     let test: Arc<[u32]> = vec![1, 2, 3].into();
     let multiple = (Arc::clone(&test), Arc::clone(&test), test);
 
     assert_eq!(
-        multiple.deep_size_of(),
+        multiple.deep_size_ignore_cycles(),
         3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>() * 3
     );
 }
@@ -124,13 +122,12 @@ fn tuples() {
     );
 }
 
-#[cfg(not(feature="no_context"))]
 mod context_tests {
     use crate::Context;
 
     #[test]
     fn context_arc_test() {
-        let mut context = Context::new();
+        let mut context = Context::new(true);
 
         let arc = alloc::sync::Arc::new(15);
         assert_eq!(context.contains_arc(&arc), false);
@@ -140,7 +137,7 @@ mod context_tests {
 
     #[test]
     fn context_rc_test() {
-        let mut context = Context::new();
+        let mut context = Context::new(true);
 
         let rc = alloc::rc::Rc::new(15);
         assert_eq!(context.contains_rc(&rc), false);
@@ -149,13 +146,12 @@ mod context_tests {
     }
 }
 
-#[cfg(feature="no_context")]
-mod context_tests {
+mod context_tests_no_cycle_check {
     use crate::Context;
 
     #[test]
     fn context_arc_test() {
-        let mut context = Context::new();
+        let mut context = Context::new(false);
 
         let arc = alloc::sync::Arc::new(15);
         assert_eq!(context.contains_arc(&arc), false);
@@ -165,7 +161,7 @@ mod context_tests {
 
     #[test]
     fn context_rc_test() {
-        let mut context = Context::new();
+        let mut context = Context::new(false);
 
         let rc = alloc::rc::Rc::new(15);
         assert_eq!(context.contains_rc(&rc), false);

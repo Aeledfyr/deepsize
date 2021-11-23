@@ -61,6 +61,8 @@ pub trait DeepSizeOf {
     /// This is an estimation and not a precise result because it
     /// doesn't account for allocator's overhead.
     ///
+    /// This function does reference counting of all `Arc<...>`, `Rc<...>`, which adds extra
+    /// overhead to execution time.
     /// ```rust
     /// use deepsize::DeepSizeOf;
     ///
@@ -79,7 +81,19 @@ pub trait DeepSizeOf {
     /// );
     /// ```
     fn deep_size_of(&self) -> usize {
-        size_of_val(self) + self.deep_size_of_children(&mut Context::new())
+        size_of_val(self) + self.deep_size_of_children(&mut Context::new(true))
+    }
+
+    /// Returns an estimation of a total size of memory owned by the
+    /// object, including heap-managed storage.
+    ///
+    /// This is an estimation and not a precise result because it
+    /// doesn't account for allocator's overhead.
+    ///
+    /// This a version of `deep_size_of(...)` which doesn't do reference counting for `Rc<..>`
+    /// and `Arc<..>` for performance reasons.
+    fn deep_size_ignore_cycles(&self) -> usize {
+        size_of_val(self) + self.deep_size_of_children(&mut Context::new(false))
     }
 
     /// Returns an estimation of the heap-managed storage of this object.
@@ -127,7 +141,6 @@ pub trait DeepSizeOf {
 #[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet as GenericSet;
 #[cfg(feature = "std")]
-#[cfg(not(feature="no_context"))]
 use std::collections::HashSet as GenericSet;
 
 /// The context of which references have already been seen.
@@ -151,40 +164,37 @@ use std::collections::HashSet as GenericSet;
 #[derive(Debug)]
 pub struct Context {
     /// A set of all [`Arc`](std::sync::Arc)s that have already been counted
-    #[cfg(not(feature="no_context"))]
     arcs: GenericSet<usize>,
     /// A set of all [`Rc`](std::sync::Arc)s that have already been counted
-    #[cfg(not(feature="no_context"))]
     rcs: GenericSet<usize>,
+    /// Flag indicating whenever checking arc/rcs reference counting is enabled or not.
+    cycle_check: bool,
 }
 
 impl Context {
     /// Creates a new empty context for use in the `deep_size` functions
-    fn new() -> Self {
+    fn new(cycle_check: bool) -> Self {
         Self {
-            #[cfg(not(feature="no_context"))]
             arcs: GenericSet::new(),
-            #[cfg(not(feature="no_context"))]
             rcs: GenericSet::new(),
+            cycle_check
         }
     }
 
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
     #[allow(unused)]
     fn add_arc<T: ?Sized>(&mut self, arc: &alloc::sync::Arc<T>) {
-        #[cfg(not(feature="no_context"))]
-        self.arcs.insert(&**arc as *const T as *const u8 as usize);
+        if self.cycle_check {
+            self.arcs.insert(&**arc as *const T as *const u8 as usize);
+        }
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
     #[allow(unused)]
     fn contains_arc<T: ?Sized>(&self, arc: &alloc::sync::Arc<T>) -> bool {
-        #[cfg(not(feature="no_context"))]
-        {
+        if self.cycle_check {
             self.arcs
                 .contains(&(&**arc as *const T as *const u8 as usize))
-        }
-        #[cfg(feature="no_context")]
-        {
+        } else {
             false
         }
     }
@@ -192,20 +202,18 @@ impl Context {
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     #[allow(unused)]
     fn add_rc<T: ?Sized>(&mut self, rc: &alloc::rc::Rc<T>) {
-        #[cfg(not(feature="no_context"))]
-        self.rcs.insert(&**rc as *const T as *const u8 as usize);
+        if self.cycle_check {
+            self.rcs.insert(&**rc as *const T as *const u8 as usize);
+        }
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
     #[allow(unused)]
     fn contains_rc<T: ?Sized>(&self, rc: &alloc::rc::Rc<T>) -> bool {
-        #[cfg(not(feature="no_context"))]
-        {
+        if self.cycle_check {
             self.rcs
                 .contains(&(&**rc as *const T as *const u8 as usize))
-        }
-        #[cfg(feature="no_context")]
-        {
+        } else {
             false
         }
     }

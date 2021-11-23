@@ -35,6 +35,7 @@ fn boxes() {
 }
 
 #[test]
+#[cfg(not(feature="no_context"))]
 fn arcs() {
     use std::sync::Arc;
     let test: Arc<[u32]> = vec![1, 2, 3].into();
@@ -43,6 +44,19 @@ fn arcs() {
     assert_eq!(
         multiple.deep_size_of(),
         3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>()
+    );
+}
+
+#[test]
+#[cfg(feature="no_context")]
+fn arcs() {
+    use std::sync::Arc;
+    let test: Arc<[u32]> = vec![1, 2, 3].into();
+    let multiple = (Arc::clone(&test), Arc::clone(&test), test);
+
+    assert_eq!(
+        multiple.deep_size_of(),
+        3 * size_of::<Arc<[u32]>>() + 3 * size_of::<u32>() * 3
     );
 }
 
@@ -110,6 +124,7 @@ fn tuples() {
     );
 }
 
+#[cfg(not(feature="no_context"))]
 mod context_tests {
     use crate::Context;
 
@@ -133,6 +148,32 @@ mod context_tests {
         assert_eq!(context.contains_rc(&rc), true);
     }
 }
+
+#[cfg(feature="no_context")]
+mod context_tests {
+    use crate::Context;
+
+    #[test]
+    fn context_arc_test() {
+        let mut context = Context::new();
+
+        let arc = alloc::sync::Arc::new(15);
+        assert_eq!(context.contains_arc(&arc), false);
+        context.add_arc(&arc);
+        assert_eq!(context.contains_arc(&arc), false);
+    }
+
+    #[test]
+    fn context_rc_test() {
+        let mut context = Context::new();
+
+        let rc = alloc::rc::Rc::new(15);
+        assert_eq!(context.contains_rc(&rc), false);
+        context.add_rc(&rc);
+        assert_eq!(context.contains_rc(&rc), false);
+    }
+}
+
 
 #[cfg(feature = "derive")]
 mod test_derive {

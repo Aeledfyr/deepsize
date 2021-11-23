@@ -127,6 +127,7 @@ pub trait DeepSizeOf {
 #[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet as GenericSet;
 #[cfg(feature = "std")]
+#[cfg(not(feature="no_context"))]
 use std::collections::HashSet as GenericSet;
 
 /// The context of which references have already been seen.
@@ -150,8 +151,10 @@ use std::collections::HashSet as GenericSet;
 #[derive(Debug)]
 pub struct Context {
     /// A set of all [`Arc`](std::sync::Arc)s that have already been counted
+    #[cfg(not(feature="no_context"))]
     arcs: GenericSet<usize>,
     /// A set of all [`Rc`](std::sync::Arc)s that have already been counted
+    #[cfg(not(feature="no_context"))]
     rcs: GenericSet<usize>,
 }
 
@@ -159,30 +162,52 @@ impl Context {
     /// Creates a new empty context for use in the `deep_size` functions
     fn new() -> Self {
         Self {
+            #[cfg(not(feature="no_context"))]
             arcs: GenericSet::new(),
+            #[cfg(not(feature="no_context"))]
             rcs: GenericSet::new(),
         }
     }
 
     /// Adds an [`Arc`](std::sync::Arc) to the list of visited [`Arc`](std::sync::Arc)s
+    #[allow(unused)]
     fn add_arc<T: ?Sized>(&mut self, arc: &alloc::sync::Arc<T>) {
+        #[cfg(not(feature="no_context"))]
         self.arcs.insert(&**arc as *const T as *const u8 as usize);
     }
     /// Checks if an [`Arc`](std::sync::Arc) is in the list visited [`Arc`](std::sync::Arc)s
+    #[allow(unused)]
     fn contains_arc<T: ?Sized>(&self, arc: &alloc::sync::Arc<T>) -> bool {
-        self.arcs
-            .contains(&(&**arc as *const T as *const u8 as usize))
+        #[cfg(not(feature="no_context"))]
+        {
+            self.arcs
+                .contains(&(&**arc as *const T as *const u8 as usize))
+        }
+        #[cfg(feature="no_context")]
+        {
+            false
+        }
     }
 
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
+    #[allow(unused)]
     fn add_rc<T: ?Sized>(&mut self, rc: &alloc::rc::Rc<T>) {
+        #[cfg(not(feature="no_context"))]
         self.rcs.insert(&**rc as *const T as *const u8 as usize);
     }
     /// Checks if an [`Rc`](std::rc::Rc) is in the list visited [`Rc`](std::rc::Rc)s
     /// Adds an [`Rc`](std::rc::Rc) to the list of visited [`Rc`](std::rc::Rc)s
+    #[allow(unused)]
     fn contains_rc<T: ?Sized>(&self, rc: &alloc::rc::Rc<T>) -> bool {
-        self.rcs
-            .contains(&(&**rc as *const T as *const u8 as usize))
+        #[cfg(not(feature="no_context"))]
+        {
+            self.rcs
+                .contains(&(&**rc as *const T as *const u8 as usize))
+        }
+        #[cfg(feature="no_context")]
+        {
+            false
+        }
     }
 }
 

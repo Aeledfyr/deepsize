@@ -7,7 +7,7 @@ description = "A crate for measuring the total size of object on the stack and h
 repository = "https://github.com/Aeledfyr/deepsize/"
 include = ["Cargo.toml", "src/**/*.rs", "../LICENSE", "../README.md"]
 readme = "../README.md"
-edition = "2018"
+edition = "2021"
 keywords = ["size", "stack", "heap", "macro"]
 categories = ["development-tools::profiling", "memory-management"]
 

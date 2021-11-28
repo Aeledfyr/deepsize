@@ -99,11 +99,7 @@ mod strings {
     }
     impl DeepSizeOf for CString {
         fn deep_size_of_children(&self, _: &mut Context) -> usize {
-            // This may cause a length check at runtime, but that
-            // doesn't seem avoidable.  This assumes that the allocation
-            // is the exact length of the string and the added null
-            // terminator.
-            self.as_bytes().len() + 1
+            self.as_bytes_with_nul().len()
         }
     }
 }

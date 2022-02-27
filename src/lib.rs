@@ -147,7 +147,7 @@ use std::collections::HashSet as GenericSet;
 ///
 /// This must be passed between `deep_size_of_children` calls when
 /// recursing, so that references are not counted multiple timse.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Context {
     /// A set of all [`Arc`](std::sync::Arc)s that have already been counted
     arcs: GenericSet<usize>,
@@ -157,7 +157,7 @@ pub struct Context {
 
 impl Context {
     /// Creates a new empty context for use in the `deep_size` functions
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             arcs: GenericSet::new(),
             rcs: GenericSet::new(),

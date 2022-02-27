@@ -194,3 +194,10 @@ mod actix_impl {
         }
     }
 }
+
+#[cfg(feature = "log")]
+mod log_impl {
+    use crate::known_deep_size;
+
+    known_deep_size!(0; log::Level);
+}

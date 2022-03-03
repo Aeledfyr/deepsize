@@ -43,6 +43,18 @@ mod slab_impl {
     }
 }
 
+#[cfg(feature = "internment")]
+mod internment_impl {
+    use crate::{Context, DeepSizeOf};
+    use internment::Intern;
+
+    impl<T> DeepSizeOf for Intern<T> {
+        fn deep_size_of_children(&self, _context: &mut Context) -> usize {
+            0
+        }
+    }
+}
+
 #[cfg(feature = "arrayvec")]
 mod arrayvec_impl {
     use crate::{known_deep_size, Context, DeepSizeOf};

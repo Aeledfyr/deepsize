@@ -194,3 +194,69 @@ mod actix_impl {
         }
     }
 }
+
+#[cfg(feature = "serde_json")]
+mod serde_json_impl {
+    use crate::{known_deep_size, Context, DeepSizeOf};
+    use alloc::collections::BTreeMap;
+    use core::mem::size_of;
+    use serde_json::{Map, Number, Value};
+
+    impl DeepSizeOf for Value {
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            match self {
+                Value::Null => 0,
+                Value::Bool(x) => x.deep_size_of_children(context),
+                Value::Number(x) => x.deep_size_of_children(context),
+                Value::String(x) => x.deep_size_of_children(context),
+                Value::Array(x) => x.deep_size_of_children(context),
+                Value::Object(x) => x.deep_size_of_children(context),
+            }
+        }
+    }
+
+    known_deep_size!(0;
+        Number,
+    );
+
+    impl DeepSizeOf for Map<String, Value> {
+        fn deep_size_of_children(&self, context: &mut Context) -> usize {
+            use crate::{BTREE_B, BTREE_MAX, BTREE_MIN};
+            use indexmap::IndexMap;
+
+            // Either it is a BTreeMap or an IndexMap, which have different sizes
+            // It would be nice if we could tell this via cfg(...), but it seems
+            // that isn't possible :(.
+
+            // But if they are the same size, then gg.
+            assert_ne!(
+                size_of::<BTreeMap<String, Value>>(),
+                size_of::<IndexMap<String, Value>>()
+            );
+
+            if size_of::<BTreeMap<String, Value>>() == size_of::<Map<String, Value>>() {
+                // Then its a BTreeMap actually
+                let element_size = self.iter().fold(0, |sum, (k, v)| {
+                    sum + k.deep_size_of_children(context) + v.deep_size_of_children(context)
+                });
+                let overhead = size_of::<(
+                    usize,
+                    u16,
+                    u16,
+                    [(String, Value); BTREE_MAX],
+                    [usize; BTREE_B],
+                )>();
+                element_size + self.len() * overhead * 2 / (BTREE_MAX + BTREE_MIN)
+            } else {
+                // Then it's an IndexMap actually
+                let child_sizes = self.iter().fold(0, |sum, (key, val)| {
+                    sum + key.deep_size_of_children(context) + val.deep_size_of_children(context)
+                });
+                let estimated_cap = self.len().saturating_mul(2);
+                let map_size =
+                    estimated_cap * (size_of::<(usize, String, Value)>() + size_of::<usize>());
+                child_sizes + map_size
+            }
+        }
+    }
+}

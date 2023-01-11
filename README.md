@@ -37,6 +37,7 @@ references, and are not counted.
 * `chrono`: (version 0.4)
 * `actix`: (version 0.11)
 * `tokio`: (version 1.1)
+* `bitvec`: (version 1.0.1)
 
 ## Example Code
 

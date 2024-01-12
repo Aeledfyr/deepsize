@@ -194,3 +194,15 @@ mod actix_impl {
         }
     }
 }
+
+#[cfg(feature = "bitvec")]
+mod bitvec_impl {
+    use crate::{Context, DeepSizeOf};
+    use bitvec::vec::BitVec;
+
+    impl DeepSizeOf for BitVec {
+        fn deep_size_of_children(&self, _context: &mut Context) -> usize {
+            self.capacity() / 8
+        }
+    }
+}
